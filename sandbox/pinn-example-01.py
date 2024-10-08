@@ -7,7 +7,6 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
 
 
-# Define the Neural Network for the Physics Informed Neural Network (PINN)
 class PINN(nn.Module):
     """
     Physics Informed Neural Network (PINN) for solving the ODE: dy/dt = -a * y
@@ -50,20 +49,18 @@ class PINN(nn.Module):
         torch.Tensor
             The solution of the ODE at the given time and parameter.
         """
-        # Ensure both t and param have the same dimensions
         if param.dim() == 1:
-            param = param.unsqueeze(1)  # Add a singleton dimension
+            param = param.unsqueeze(1)
         if t.dim() == 1:
-            t = t.unsqueeze(1)  # Add a singleton dimension
-        inputs = torch.cat((t, param), dim=1)  # Concatenate along the second dimension
-        return self.hidden(inputs)  # Evaluate the hidden layers on the inputs
+            t = t.unsqueeze(1)
+        inputs = torch.cat((t, param), dim=1)
+        return self.hidden(inputs)
 
 
-# Define the parameterized ODE: dy/dt = -a * y
 def ode_function(
-    y: torch.Tensor,  # Current value of the solution
-    a: torch.Tensor,  # Parameter of the ODE
-) -> torch.Tensor:  # Right-hand side of the ODE
+    y: torch.Tensor,
+    a: torch.Tensor,
+) -> torch.Tensor:
     """
     Compute the right-hand side of the ODE: dy/dt = -a * y
 
@@ -82,7 +79,6 @@ def ode_function(
     return -a * y
 
 
-# Loss function for the Physics Informed Neural Network
 def pinn_loss(
     model: PINN,
     t: torch.Tensor,
@@ -108,10 +104,8 @@ def pinn_loss(
     loss : torch.Tensor
         The loss of the PINN
     """
-    # Compute the prediction for the initial value
     y_pred = model(t, param)
 
-    # Compute the derivative using autograd
     y_pred_t = torch.autograd.grad(
         outputs=y_pred,
         inputs=t,
@@ -119,17 +113,13 @@ def pinn_loss(
         create_graph=True,
     )[0]
 
-    # Compute the ODE residual
+    # ODE residual
     f = y_pred_t - ode_function(y_pred, param)
+    # Model evaluation at t=0
+    ym0 = model(torch.tensor([[0.0]], dtype=torch.float32), param[0].unsqueeze(0))
 
-    # Mean squared error of the ODE residual
-    loss1 = torch.mean(f**2)
-    # Initial condition error
-    loss2 = (
-        model(torch.tensor([[0.0]], dtype=torch.float32), param[0].unsqueeze(0)) - y0
-    ) ** 2
-
-    return loss1 + loss2
+    # Loss function
+    return torch.mean(f**2) + (ym0 - y0) ** 2
 
 
 # Training the PINN
@@ -150,13 +140,13 @@ def main():
     t = torch.linspace(0, 2, 100).reshape(-1, 1)
     t = t.requires_grad_()
 
-    # Parameters a for the ODE (more than one value)
+    # Parameters a for the ODE
     a_values = torch.tensor([0.5, 1.0, 1.5], dtype=torch.float32)
     t_repeated = t.repeat(a_values.shape[0], 1)
-    a = a_values.repeat_interleave(t.shape[0]).reshape(-1, 1)
+    a_repeated = a_values.repeat_interleave(t.shape[0]).reshape(-1, 1)
 
     # Create a dataset and data loader for batching
-    dataset = TensorDataset(t_repeated, a)
+    dataset = TensorDataset(t_repeated, a_repeated)
     batch_size = 32
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
