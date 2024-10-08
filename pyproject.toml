@@ -10,7 +10,8 @@ disable_error_code = ["name-defined"]
 ignore_missing_imports = true
 module = [
   "chaospy",
-  "scipy.integrate"
+  "scipy.integrate",
+  "numpoly"
 ]
 
 [tool.poetry]

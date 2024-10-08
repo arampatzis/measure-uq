@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Script for the presentation of the chaospy package on a simple ODE."""
 
+import sys
 from typing import Any
 
 import chaospy
 import matplotlib.pyplot as plt
+import numpoly
 import numpy as np
 from scipy.integrate import odeint
 
 plt.rc("figure", figsize=[12, 8])
 
 
-def model_solver(parameters, t):
+def model_solver(
+    parameters: tuple[float, float],
+    t: np.ndarray,
+) -> np.ndarray:
     """
     Return the numerical solution of the ODE.
 
@@ -40,11 +45,12 @@ def model_solver(parameters, t):
 def collocation_pce(
     t: np.ndarray,
     joint: chaospy.Distribution,
-    expansion: chaospy.poly.Poly,
+    expansion: numpoly.baseclass.ndpoly,
     samples: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Point collocation formulation of PCE
+    Point collocation formulation of PCE. See also:
+    https://github.com/jonathf/chaospy/blob/master/docs/user_guide/main_usage/point_collocation.ipynb
 
     Parameters
     ----------
@@ -57,7 +63,11 @@ def collocation_pce(
     samples : np.ndarray
         Collocation points
     """
-    evals = model_solver(samples.T, t).T
+    import inspect
+
+    print(inspect.getmro(expansion.__class__))
+    sys.exit()
+    evals = [model_solver(sample, t) for sample in samples.T]
 
     u_approx = chaospy.fit_regression(expansion, samples, evals)
 
@@ -70,11 +80,12 @@ def collocation_pce(
 def galerkin_pce(
     t: np.ndarray,
     joint: chaospy.Distribution,
-    expansion: chaospy.poly.Poly,
+    expansion: numpoly.baseclass.ndpoly,
     norms: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Galerkin formulation of PCE
+    Galerkin formulation of PCE. See also:
+    https://github.com/jonathf/chaospy/blob/master/docs/user_guide/main_usage/intrusive_galerkin.ipynb
 
     Parameters
     ----------
