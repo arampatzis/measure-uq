@@ -2,6 +2,17 @@
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
 
+[tool.mypy]
+python_version = "3.10"
+
+[[tool.mypy.overrides]]
+disable_error_code = ["name-defined"]
+ignore_missing_imports = true
+module = [
+  "chaospy",
+  "scipy.integrate"
+]
+
 [tool.poetry]
 authors = ["Your Name <you@example.com>"]
 description = ""
@@ -17,6 +28,7 @@ python = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"
+mypy = "^1.11.2"
 pre-commit = "^4.0.0"
 pretty-errors = "^1.2.25"
 
