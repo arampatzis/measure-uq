@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Script for the presentation of the chaospy package on a simple ODE."""
 
-import sys
 from typing import Any
 
 import chaospy
@@ -63,10 +62,6 @@ def collocation_pce(
     samples : np.ndarray
         Collocation points
     """
-    import inspect
-
-    print(inspect.getmro(expansion.__class__))
-    sys.exit()
     evals = [model_solver(sample, t) for sample in samples.T]
 
     u_approx = chaospy.fit_regression(expansion, samples, evals)
