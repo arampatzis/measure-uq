@@ -81,7 +81,7 @@ def galerkin_pce(
     t : np.ndarray
         Time array
     joint : chaospy.Distribution
-        Joint distribution
+        Joint distribution of the random parameters
     expansion : chaospy.poly.Poly
         PCE expansion
     norms : np.ndarray
