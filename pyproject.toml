@@ -23,10 +23,13 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 chaospy = "^4.3.17"
+clearml = "^1.16.4"
 matplotlib = "^3.9.2"
 numpy = "v1.26.4"
 python = "^3.10"
+python-box = "^7.2.0"
 torch = "2.2.2"
+wandb = "^0.18.3"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"
