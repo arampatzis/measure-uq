@@ -167,11 +167,12 @@ def main():
     net = dde.nn.FNN(layer_size, "tanh", "Glorot uniform")
 
     model = dde.Model(pde, net)
+
+    # add decay=("step", 1000, 0.2) for learning rate decay
     model.compile(
         config.optimizer.type,
         lr=config.optimizer.lr,
         loss_weights=[0.01, 1],
-        decay=("step", 1000, 0.2),
     )
     losshistory, train_state = model.train(
         iterations=config.iterations,
