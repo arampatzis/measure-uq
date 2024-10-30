@@ -1,189 +1,197 @@
 #!/usr/bin/env python3
-"""Script to test the PINN for solving the ODE dy/dt = -a * y."""
+"""Script to test the PINN for solving the ODE dy/dt = alpha * y."""
 
+import deepxde as dde
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
-from torch import nn, optim
-from torch.utils.data import DataLoader, TensorDataset
+import wandb
+from box import Box
 
 
-class PINN(nn.Module):
+def ode(
+    t: np.ndarray,
+    y: np.ndarray,
+    alpha: float,
+) -> torch.Tensor:
     """
-    Physics Informed Neural Network (PINN) for solving the ODE: dy/dt = -a * y
+    Return the residual of the ODE dy/dt = alpha * y.
 
-    This class implements a neural network with two inputs, time and parameter,
-    and one output, the solution of the ODE.
+    Parameters
+    ----------
+    t : np.typing.ArrayLike
+        Time points
+    y : np.typing.ArrayLike
+        Solution value(s)
+    alpha : float
+        Constant in the ODE
 
-    The neural network is composed of three fully connected layers with
-    hyperbolic tangent activation functions.
+    Returns
+    -------
+    np.typing.ArrayLike
+        The value(s) of dy/dt
+    """
+    return dde.grad.jacobian(y, t) - alpha * y
+
+
+def solution(t: np.ndarray, y0: float, alpha: float) -> np.ndarray:
+    """
+    Compute the solution of the ODE dy/dt = alpha * y with initial condition y(0) = y0.
+
+    Parameters
+    ----------
+    t : np.ndarray
+        Time points where to evaluate the solution.
+    y0 : float
+        Initial condition at t=0.
+    alpha : float
+        Constant in the ODE.
+
+    Returns
+    -------
+    np.ndarray
+        Solution of the ODE at the given time points.
+    """
+    return y0 * np.exp(alpha * t)
+
+
+class WandbLog(dde.callbacks.Callback):
+    """
+    Callback for logging training metrics to Weights & Biases.
+
+    Attributes
+    ----------
+    every : int
+        Frequency of logging in terms of training steps.
+
+    Methods
+    -------
+    on_batch_end():
+        Logs training loss and learning rate to Weights & Biases at specified intervals.
+    on_train_end():
+        Placeholder for actions to perform at the end of training.
     """
 
-    def __init__(self) -> None:
-        """
-        Initialize the neural network.
-
-        This function takes no arguments and returns nothing.
-        """
+    def __init__(self, every: int):
+        self.every = every
         super().__init__()
-        self.hidden = nn.Sequential(
-            nn.Linear(2, 20),  # Input now has two dimensions: time and parameter
-            nn.Tanh(),
-            nn.Linear(20, 20),
-            nn.Tanh(),
-            nn.Linear(20, 1),
-        )
 
-    def forward(self, t: torch.Tensor, param: torch.Tensor) -> torch.Tensor:
+    def on_batch_end(self) -> None:
         """
-        Compute the output of the neural network for the given time and parameter.
+        Log training loss and learning rate to Weights & Biases at specified intervals.
 
         Parameters
         ----------
-        t : torch.Tensor
-            Time point(s) to evaluate the solution at.
-        param : torch.Tensor
-            Parameter(s) to evaluate the solution at.
+        self : Callback
+            The callback object.
 
         Returns
         -------
-        torch.Tensor
-            The solution of the ODE at the given time and parameter.
+        None
         """
-        if param.dim() == 1:
-            param = param.unsqueeze(1)
-        if t.dim() == 1:
-            t = t.unsqueeze(1)
-        inputs = torch.cat((t, param), dim=1)
-        return self.hidden(inputs)
+        if self.model.train_state.step % self.every == 0:
+            print("Log in wandb...")
+            _, loss = self.model._outputs_losses(
+                True,
+                self.model.train_state.X_train,
+                self.model.train_state.y_train,
+                self.model.train_state.train_aux_vars,
+            )
+            wandb.log(
+                {
+                    "iteration": self.model.train_state.step,
+                    "train/loss": np.sum(loss),
+                    "lr": self.model.opt.param_groups[-1]["lr"],
+                },
+            )
 
 
-def ode_function(
-    y: torch.Tensor,
-    a: torch.Tensor,
-) -> torch.Tensor:
-    """
-    Compute the right-hand side of the ODE: dy/dt = -a * y
-
-    Parameters
-    ----------
-    y : torch.Tensor
-        Current value of the solution
-    a : torch.Tensor
-        Parameter of the ODE
-
-    Returns
-    -------
-    torch.Tensor
-        Right-hand side of the ODE
-    """
-    return -a * y
-
-
-def pinn_loss(
-    model: PINN,
-    t: torch.Tensor,
-    param: torch.Tensor,
-    y0: torch.Tensor,
-) -> torch.Tensor:
-    """
-    Compute the loss for the Physics Informed Neural Network.
-
-    Parameters
-    ----------
-    model : PINN
-        The Physics Informed Neural Network
-    t : torch.Tensor
-        Time points where to evaluate the solution
-    param : torch.Tensor
-        Parameter of the ODE
-    y0 : torch.Tensor
-        Initial condition y(0)
-
-    Returns
-    -------
-    loss : torch.Tensor
-        The loss of the PINN
-    """
-    y_pred = model(t, param)
-
-    y_pred_t = torch.autograd.grad(
-        outputs=y_pred,
-        inputs=t,
-        grad_outputs=torch.ones_like(y_pred),
-        create_graph=True,
-    )[0]
-
-    # ODE residual
-    f = y_pred_t - ode_function(y_pred, param)
-    # Model evaluation at t=0
-    ym0 = model(torch.tensor([[0.0]], dtype=torch.float32), param[0].unsqueeze(0))
-
-    # Loss function
-    return torch.mean(f**2) + (ym0 - y0) ** 2
-
-
-# Training the PINN
 def main():
-    # Initial condition y(0) = 1
     """
-    Train a Physics Informed Neural Network (PINN) to solve the ODE: dy/dt = -a * y
-    with y(0) = 1 and a in [0.5, 1.0, 1.5].
+    Train a neural network to solve a simple ordinary differential equation
+    using DeepXDE. The ODE is defined as dy/dt = -2*y, with initial condition y(0) = 1.
+    The solution is y(t) = exp(-2*t).
 
-    The PINN is trained using the Adam optimizer with a learning rate of 0.01 and
-    a batch size of 32. The training loop runs for 5000 epochs.
+    The script takes no command-line arguments.
 
-    The model prediction is plotted on top of the exact ODE solution for a = 1.0.
+    The script will log the following metrics to Weights & Biases:
+
+    - The training loss at each iteration.
+    - The learning rate at each iteration.
+    - A plot of the true solution and the predicted solution at the end of training.
+
+    The script will also save the following artifacts to Weights & Biases:
+
+    - The configuration of the model (hyperparameters).
+    - The trained model itself.
     """
-    y0 = torch.tensor([[1.0]], dtype=torch.float32)
+    config = Box(
+        {
+            "project_name": "deepxpde-for-simple-ode",
+            "iterations": 5000,
+            "optimizer": {
+                "type": "adam",
+                "lr": 0.1,
+            },
+            "ode": {
+                "y0": 1,
+                "Tf": 1,
+                "alpha": -2,
+            },
+        },
+    )
 
-    # Time domain for training
-    t = torch.linspace(0, 2, 100).reshape(-1, 1)
-    t = t.requires_grad_()
+    wandb.init(
+        project=config.project_name,
+        config=config.to_dict(),
+    )
 
-    # Parameters a for the ODE
-    a_values = torch.tensor([0.5, 1.0, 1.5], dtype=torch.float32)
-    t_repeated = t.repeat(a_values.shape[0], 1)
-    a_repeated = a_values.repeat_interleave(t.shape[0]).reshape(-1, 1)
+    geom = dde.geometry.TimeDomain(0, config.ode.Tf)
+    ic = dde.icbc.IC(
+        geom,
+        lambda _: config.ode.y0,
+        lambda _, on_initial: on_initial,
+        component=0,
+    )
+    pde = dde.data.PDE(
+        geom,
+        lambda t, y: ode(t, y, config.ode.alpha),
+        ic,
+        train_distribution="pseudo",
+        num_domain=19,
+        num_boundary=2,
+        num_test=500,
+    )
 
-    # Create a dataset and data loader for batching
-    dataset = TensorDataset(t_repeated, a_repeated)
-    batch_size = 32
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    layer_size = [1] + [50] * 3 + [1]
+    net = dde.nn.FNN(layer_size, "tanh", "Glorot uniform")
 
-    # Instantiate the model
-    model = PINN()
+    model = dde.Model(pde, net)
+    model.compile(
+        config.optimizer.type,
+        lr=config.optimizer.lr,
+        loss_weights=[0.01, 1],
+        decay=("step", 1000, 0.2),
+    )
+    losshistory, train_state = model.train(
+        iterations=config.iterations,
+        callbacks=[
+            WandbLog(100),
+        ],
+    )
 
-    # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    fig, ax = plt.subplots(1, 1)
 
-    # Training loop
-    epochs = 5000
-    for epoch in range(epochs):
-        for batch in data_loader:
-            t_batch, a_batch = batch
-            optimizer.zero_grad()
-            loss = pinn_loss(model, t_batch, a_batch, y0)
-            loss.backward()
-            optimizer.step()
+    t = np.linspace(0, 1, 100).reshape(100, 1)
+    y_true = solution(t, config.ode.y0, config.ode.alpha)
+    ax.plot(t, y_true, color="black", label="exact solution")
 
-        if epoch % 500 == 0:
-            print(f"Epoch {epoch}, Loss: {loss.item()}")
+    y_pred = model.predict(t)
 
-    # Plotting the model prediction on top of the exact ODE solution
-    t_eval = torch.linspace(0, 2, 100).reshape(-1, 1)
-    a_eval = torch.tensor(1.0, dtype=torch.float32).expand(t_eval.shape[0], 1)
-    y_pred = model(t_eval, a_eval).detach().numpy()
+    ax.plot(t, y_pred, color="orange", linestyle="dashed", label="x_pred")
+    ax.legend()
 
-    # Exact solution for dy/dt = -a * y with y(0) = 1 and a = 1.0
-    y_exact = torch.exp(-a_eval[0, 0] * t_eval).numpy()
-
-    plt.plot(t_eval.numpy(), y_pred, label="PINN Prediction", linestyle="--")
-    plt.plot(t_eval.numpy(), y_exact, label="Exact Solution", linestyle="-")
-    plt.xlabel("t")
-    plt.ylabel("y")
-    plt.legend()
-    plt.title("PINN Prediction vs Exact Solution")
-    plt.show()
+    wandb.log({"plot": wandb.Image(fig)})
 
 
 if __name__ == "__main__":

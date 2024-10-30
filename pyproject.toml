@@ -11,7 +11,8 @@ ignore_missing_imports = true
 module = [
   "chaospy",
   "scipy.integrate",
-  "numpoly"
+  "numpoly",
+  "deepxde"
 ]
 
 [tool.poetry]
@@ -24,6 +25,7 @@ version = "0.1.0"
 [tool.poetry.dependencies]
 chaospy = "^4.3.17"
 clearml = "^1.16.4"
+deepxde = "^1.12.1"
 matplotlib = "^3.9.2"
 numpy = "v1.26.4"
 python = "^3.10"
@@ -83,7 +85,8 @@ ignore = [
   "T201",
   "TRY003",
   "ISC001",
-  "N806"
+  "N806",
+  "SLF001"
 ]
 select = ["ALL"]
 
