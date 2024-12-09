@@ -51,6 +51,7 @@ ignore = [
   "D205",
   "D212",
   "D400",
+  "D401",
   "D415",
   # pylint
   "PLR0913",
@@ -71,7 +72,9 @@ ignore = [
   # flake8-commas
   "COM819",
   #
+  "B027",
   "PD901",
+  "PD011",
   "PERF203",
   "A002",
   "A003",
@@ -83,7 +86,8 @@ ignore = [
   "T201",
   "TRY003",
   "ISC001",
-  "N806"
+  "N806",
+  "SLF001"
 ]
 select = ["ALL"]
 
