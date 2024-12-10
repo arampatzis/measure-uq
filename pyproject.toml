@@ -74,6 +74,7 @@ ignore = [
   # flake8-commas
   "COM819",
   #
+  "NPY002",
   "B027",
   "PD901",
   "PD011",

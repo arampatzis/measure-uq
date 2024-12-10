@@ -122,12 +122,6 @@ class Trainer:
             if self.trainer_data.scheduler is not None:
                 self.trainer_data.scheduler.step()
 
-            if (
-                self.trainer_data.iteration % self.trainer_data.test_every == 0
-                and self.trainer_data.iteration > 0
-            ):
-                self.test_step()
-
             if self._stoppers.should_stop():
                 break
 
@@ -172,6 +166,12 @@ class Trainer:
         loss.backward()
 
         self.trainer_data.losses_train(self.trainer_data.iteration, loss.item())
+
+        if (
+            self.trainer_data.iteration % self.trainer_data.test_every == 0
+            and self.trainer_data.iteration > 0
+        ):
+            self.test_step()
 
         self.trainer_data.iteration += 1
         clear()
