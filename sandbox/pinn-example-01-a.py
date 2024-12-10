@@ -22,7 +22,8 @@ from measure_uq.models import PINN
 from measure_uq.pde import PDE, Condition, Parameters
 from measure_uq.plots import plot_losses, plot_ode_on_grid
 from measure_uq.stoppers import TrainingLossStopper
-from measure_uq.trainer import Trainer
+from measure_uq.trainers.trainer import Trainer
+from measure_uq.trainers.trainer_data import TrainerData
 
 
 def analytical_solution(t: float | np.ndarray, p: list | tuple):
@@ -113,12 +114,12 @@ class CallbackLog(Callback):
     def on_iteration_end(self):
         """Prints the loss value at each iteration."""
         if (
-            self.trainer.iteration % self.print_every == 0
-            or self.trainer.iteration == self.trainer.iterations - 1
+            self.trainer_data.iteration % self.print_every == 0
+            or self.trainer_data.iteration == self.trainer_data.iterations - 1
         ):
             print(
-                f"{self.trainer.losses_train.index[-1]:10}:  "
-                f"{self.trainer.losses_train.values[-1]:.5e}",
+                f"{self.trainer_data.losses_train.index[-1]:10}:  "
+                f"{self.trainer_data.losses_train.values[-1]:.5e}",
             )
 
 
@@ -154,22 +155,30 @@ def main():
         parameters_test=parameters_test,
     )
 
-    trainer = Trainer(
+    trainer_data = TrainerData(
         pde=pde,
-        iterations=10000,
+        iterations=1000,
         model=model,
         optimizer=optim.Adam(
             model.parameters(),
             lr=0.01,
             amsgrad=True,
         ),
-        callbacks=[CallbackLog(print_every=100)],
-        stoppers=[TrainingLossStopper(patience=100, delta=1e-9)],
+    )
+
+    trainer = Trainer(
+        trainer_data=trainer_data,
+        callbacks=[
+            CallbackLog(trainer_data=trainer_data, print_every=100),
+        ],
+        stoppers=[
+            TrainingLossStopper(trainer_data=trainer_data, patience=100, delta=1e-9),
+        ],
     )
 
     trainer.train()
 
-    fig1, ax1 = plot_losses(pde, trainer)
+    fig1, ax1 = plot_losses(trainer_data)
 
     fig2, ax2 = plot_ode_on_grid(
         model=model,

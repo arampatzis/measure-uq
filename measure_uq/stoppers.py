@@ -22,36 +22,36 @@ This module relies on the `Trainer` class from the `measure_uq.trainer` module.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from measure_uq.trainer import Trainer
+    from measure_uq.trainers.trainer_data import TrainerData
 
 
 @dataclass(kw_only=True)
 class Stopper(ABC):
     """
-    Abstract base class for implementing stopping criteria in training.
+    Abstract base class for defining a stopping criterion.
 
-    Attributes
+    Parameters
     ----------
-    trainer : measure_uq.trainer.Trainer
-        The trainer instance associated with the stopper.
+    trainer_data : TrainerData
+        The trainer data instance containing the training losses and other relevant
+        information.
+
+    Methods
+    -------
+    should_stop() : bool
+        Determine whether training should be stopped.
+
+    Returns
+    -------
+        bool
+            True if training should be stopped, False otherwise.
     """
 
-    trainer: Trainer = field(init=False, repr=True)
-
-    def set_trainer(self, trainer: Trainer):
-        """
-        Set the trainer for this stopper.
-
-        Parameters
-        ----------
-        trainer : measure_uq.trainer.Trainer
-            The trainer to be associated with this stopper.
-        """
-        self.trainer = trainer
+    trainer_data: TrainerData
 
     @abstractmethod
     def should_stop(self) -> bool:
@@ -78,18 +78,6 @@ class StopperList:
     """
 
     stoppers: list[Stopper]
-
-    def set_trainer(self, trainer: Trainer):
-        """
-        Assign a trainer to each stopper in the list.
-
-        Parameters
-        ----------
-        trainer : measure_uq.trainer.Trainer
-            The trainer to be associated with each stopper.
-        """
-        for stopper in self.stoppers:
-            stopper.set_trainer(trainer)
 
     def should_stop(self) -> bool:
         """
@@ -139,7 +127,7 @@ class TrainingLossStopper(Stopper):
         bool
             True if training should be stopped, False otherwise.
         """
-        loss = self.trainer.losses_train.values[-1]
+        loss = self.trainer_data.losses_train.values[-1]
 
         if self.best_loss is None or loss < self.best_loss - self.delta:
             self.best_loss = loss
@@ -148,6 +136,6 @@ class TrainingLossStopper(Stopper):
             self.counter += 1
             if self.counter >= self.patience:
                 print("TrainingLossStopper: early stop triggered")
-                print(self.trainer.losses_train.values[-self.patience :])
+                print(self.trainer_data.losses_train.values[-self.patience :])
                 return True
         return False

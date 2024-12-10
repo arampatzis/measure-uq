@@ -24,7 +24,8 @@ from measure_uq.gradients import jacobian
 from measure_uq.models import PINN
 from measure_uq.pde import PDE, Condition, Parameters
 from measure_uq.plots import plot_losses, plot_ode_on_grid
-from measure_uq.trainer import Trainer
+from measure_uq.trainers.trainer import Trainer
+from measure_uq.trainers.trainer_data import TrainerData
 from measure_uq.utilities import cartesian_product_of_rows
 
 
@@ -152,19 +153,26 @@ class Condition3(Condition):
 
 @dataclass
 class CallbackLog(Callback):
-    """Callback to log the loss at each iteration."""
+    """
+    Callback class for logging the training progress.
+
+    Parameters
+    ----------
+    print_every : int
+        Frequency of logging in terms of number of iterations.
+    """
 
     print_every: int = 100
 
     def on_iteration_end(self):
-        """Logs the loss at each iteration."""
+        """Log the training loss at specified intervals."""
         if (
-            self.trainer.iteration % self.print_every == 0
-            or self.trainer.iteration == self.trainer.iterations - 1
+            self.trainer_data.iteration % self.print_every == 0
+            or self.trainer_data.iteration == self.trainer_data.iterations - 1
         ):
             print(
-                f"{self.trainer.losses_train.index[-1]:10}:  "
-                f"{self.trainer.losses_train.values[-1]:.5e}",
+                f"{self.trainer_data.losses_train.index[-1]:10}:  "
+                f"{self.trainer_data.losses_train.values[-1]:.5e}",
             )
 
 
@@ -213,17 +221,21 @@ def main():
         parameters_test=parameters_test,
     )
 
-    trainer = Trainer(
+    trainer_data = TrainerData(
         pde=pde,
         iterations=3000,
         model=model,
         optimizer=optim.LBFGS(model.parameters(), max_iter=5000, history_size=10),
-        callbacks=[CallbackLog(print_every=100)],
+    )
+
+    trainer = Trainer(
+        trainer_data=trainer_data,
+        callbacks=[CallbackLog(trainer_data=trainer_data, print_every=100)],
     )
 
     trainer.train()
 
-    fig1, ax1 = plot_losses(pde, trainer)
+    fig1, ax1 = plot_losses(trainer_data)
 
     fig2, ax2 = plot_ode_on_grid(
         model=model,

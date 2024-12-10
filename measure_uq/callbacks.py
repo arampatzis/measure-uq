@@ -13,34 +13,29 @@ Original source: https://github.com/lululxvi/deepxde
 
 from dataclasses import dataclass
 
-from torch import nn
+from measure_uq.trainers.trainer_data import TrainerData
 
 
 @dataclass(kw_only=True)
 class Callback:
     """
-    Base class for callbacks.
+    Abstract base class used to build new callbacks.
 
-    Attributes
+    Notes
+    -----
+    In order to activate the callbacks, pass it to the `Trainer` instance.
+
+    The `Callback` class is an abstract class that every callback should
+    inherit. It provides five methods that can be overridden to add new
+    functionality to the training process.
+
+    Parameters
     ----------
-    trainer : nn.Module or None
-        Reference of the trainer being trained.
+    trainer_data : TrainerData
+        The `TrainerData` instance containing the data of the trainer.
     """
 
-    trainer: nn.Module | None = None
-
-    def set_trainer(self, trainer):
-        """
-        Sets the trainer for the callback and calls init.
-
-        Parameters
-        ----------
-        trainer: instance of ``trainer``
-            The trainer to be set.
-        """
-        if trainer is not self.trainer:
-            self.trainer = trainer
-            self.init()
+    trainer_data: TrainerData | None = None
 
     def init(self):
         """Init after setting a trainer."""
@@ -81,17 +76,10 @@ class CallbackList:
 
     callbacks: list[Callback]
 
-    def set_trainer(self, trainer):
-        """
-        Set a trainer for each callback.
-
-        Parameters
-        ----------
-        trainer : nn.Module
-            The trainer to be set.
-        """
+    def init(self):
+        """Initialize each callback in the list."""
         for callback in self.callbacks:
-            callback.set_trainer(trainer)
+            callback.init()
 
     def on_iteration_begin(self):
         """Called at the beginning of every iteration."""
@@ -122,19 +110,3 @@ class CallbackList:
         """Called at the end of prediction."""
         for callback in self.callbacks:
             callback.on_predict_end()
-
-    def append(self, callback):
-        """
-        Append a callback to the list of callbacks.
-
-        Args:
-        ----
-            callback: The callback to be appended.
-
-        Raises:
-        ------
-            Exception: If the callback is not an instance of Callback.
-        """
-        if not isinstance(callback, Callback):
-            raise TypeError(str(callback) + " is an invalid Callback object")
-        self.callbacks.append(callback)

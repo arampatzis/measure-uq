@@ -13,13 +13,12 @@ from matplotlib import pyplot as plt
 from numpy.typing import ArrayLike
 from torch import Tensor, nn
 
-from measure_uq.pde import PDE, Parameters
-from measure_uq.trainer import Trainer
+from measure_uq.pde import Parameters
+from measure_uq.trainers.trainer_data import TrainerData
 
 
 def plot_losses(
-    pde: PDE,
-    trainer: Trainer,
+    trainer_data: TrainerData,
     figsize: tuple = (20, 10),
 ):
     """
@@ -28,10 +27,8 @@ def plot_losses(
 
     Parameters
     ----------
-    pde: PDE
-        The PDE to be solved.
-    trainer: Trainer
-        The trainer that was used for training.
+    trainer_data: TrainerData
+        The trainer_data that was used for training.
     figsize: tuple
         The size of the figure. Defaults to (20, 10).
 
@@ -45,16 +42,20 @@ def plot_losses(
     fig, ax = plt.subplots(1, 2, figsize=figsize)
 
     ax[0].set_title("Total losses")
-    ax[0].plot(trainer.losses_train.index, trainer.losses_train.values, label="train")
     ax[0].plot(
-        trainer.losses_test.index,
-        trainer.losses_test.values,
+        trainer_data.losses_train.index,
+        trainer_data.losses_train.values,
+        label="train",
+    )
+    ax[0].plot(
+        trainer_data.losses_test.index,
+        trainer_data.losses_test.values,
         "--",
         label="test",
     )
 
     ax[1].set_title("Train losses per condition")
-    for c in pde.conditions_train:
+    for c in trainer_data.pde.conditions_train:
         ax[1].plot(c.loss.index, c.loss.values, label=c.__class__.__name__)
 
     for a in ax:
