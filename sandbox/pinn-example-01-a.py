@@ -21,6 +21,7 @@ from measure_uq.gradients import jacobian
 from measure_uq.models import PINN
 from measure_uq.pde import PDE, Condition, Parameters
 from measure_uq.plots import plot_losses, plot_ode_on_grid
+from measure_uq.stoppers import TrainingLossStopper
 from measure_uq.trainer import Trainer
 
 
@@ -155,7 +156,7 @@ def main():
 
     trainer = Trainer(
         pde=pde,
-        iterations=500,
+        iterations=10000,
         model=model,
         optimizer=optim.Adam(
             model.parameters(),
@@ -163,6 +164,7 @@ def main():
             amsgrad=True,
         ),
         callbacks=[CallbackLog(print_every=100)],
+        stoppers=[TrainingLossStopper(patience=100, delta=1e-9)],
     )
 
     trainer.train()

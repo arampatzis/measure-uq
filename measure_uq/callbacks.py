@@ -11,7 +11,7 @@ See the LICENSE.LGPL file in the root directory for details.
 Original source: https://github.com/lululxvi/deepxde
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from torch import nn
 
@@ -19,11 +19,12 @@ from torch import nn
 @dataclass(kw_only=True)
 class Callback:
     """
-    Callback base class.
+    Base class for callbacks.
 
     Attributes
     ----------
-        trainer: instance of ``trainer``. Reference of the trainer being trained.
+    trainer : nn.Module or None
+        Reference of the trainer being trained.
     """
 
     trainer: nn.Module | None = None
@@ -65,22 +66,30 @@ class Callback:
 
 @dataclass(kw_only=True)
 class CallbackList:
-    """A list of callbacks to be called at certain points."""
+    """
+    A list of callbacks to be executed at specific points during training.
 
-    callbacks: list[Callback | None] = field(default_factory=list)
-    """A list of callbacks to be called at certain points."""
-    trainer: nn.Module | None = None
-    """The trainer to be set for each callback."""
+    Parameters
+    ----------
+    callbacks : list[Callback]
+        A list of callbacks to be executed. The list can be empty.
+
+    Notes
+    -----
+    The list can be empty.
+    """
+
+    callbacks: list[Callback]
 
     def set_trainer(self, trainer):
         """
         Set a trainer for each callback.
 
-        Args:
-        ----
-            trainer: The trainer to be set.
+        Parameters
+        ----------
+        trainer : nn.Module
+            The trainer to be set.
         """
-        self.trainer = trainer
         for callback in self.callbacks:
             callback.set_trainer(trainer)
 

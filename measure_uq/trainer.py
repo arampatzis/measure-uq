@@ -11,6 +11,7 @@ from torch import nn, optim
 from measure_uq.callbacks import Callback, CallbackList
 from measure_uq.gradients import clear
 from measure_uq.pde import PDE
+from measure_uq.stoppers import Stopper, StopperList
 from measure_uq.utilities import LossContainer
 
 
@@ -101,38 +102,40 @@ def get_scheduler(stype: str, optimizer: optim.Optimizer, **kwargs):
 @dataclass(kw_only=True)
 class Trainer:
     """
-    Trainer for PINNs.
+    A dataclass to manage training configurations and workflows.
 
-    This dataclass encapsulates all the necessary components for training a
-    Physics-Informed Neural Network (PINN). It facilitates the management of
-    the model, optimizer, scheduler, and training iterations, and provides
-    fundamental methods such as `train` to execute the training loop.
+    This class serves as a central controller for managing the training process,
+    including model updates, tracking losses, handling callbacks, and implementing
+    stopping criteria.
 
     Attributes
     ----------
     pde : PDE
-        The PDE to be solved by the PINN.
+        The partial differential equation (PDE) to be solved during training.
     iterations : int
-        Total number of iterations for training the model.
+        The total number of training iterations to perform.
     model : nn.Module
-        The PINN model to be trained.
+        The neural network model being trained.
     optimizer : torch.optim.Optimizer
-        The optimizer employed for model training.
-    scheduler : torch.optim.lr_scheduler._LRScheduler, optional
-        Learning rate scheduler. If not provided, no scheduling is applied.
-    iteration : int, default=0
-        The current iteration count during training.
-    test_every : int, default=100
-        Frequency of testing. If set to None, testing is skipped.
+        The optimizer used for updating model parameters.
+    scheduler : torch.optim.lr_scheduler._LRScheduler | None, optional
+        A learning rate scheduler for adjusting the learning rate, by default None.
+    iteration : int, optional
+        The current iteration during training, by default 0.
+    test_every : int | None, optional
+        Frequency (in iterations) of testing during training, by default 100.
     losses_train : LossContainer
-        Container for capturing training losses over iterations.
+        Container to store training losses.
     losses_test : LossContainer
-        Container for storing losses during testing phases.
-    callbacks : CallbackList
-        CallbackList object containing the callbacks to be executed at various stages
-        of training.
-    _callbacks : list[Callback], default=[]
-        List of callback objects that initialize the 'callback' attribute.
+        Container to store testing losses.
+    _callbacks : CallbackList
+        Internal list of callbacks for handling events during training.
+    callbacks : InitVar[list[Callback] | None], optional
+        A list of user-defined callbacks, by default None.
+    _stoppers : StopperList
+        Internal list of stopping criteria for early termination.
+    stoppers : InitVar[list[Stopper] | None], optional
+        A list of user-defined stoppers, by default None.
     """
 
     pde: PDE
@@ -163,9 +166,17 @@ class Trainer:
 
     _callbacks: CallbackList = field(init=False)
 
-    callbacks: InitVar[list[Callback | None] | None] = None
+    callbacks: InitVar[list[Callback] | None] = None
 
-    def __post_init__(self, callbacks: list[Callback | None] | None):
+    _stoppers: StopperList = field(init=False)
+
+    stoppers: InitVar[list[Stopper] | None] = None
+
+    def __post_init__(
+        self,
+        callbacks: list[Callback] | None,
+        stoppers: list[Stopper] | None,
+    ):
         """
         Initializes the trainer after construction.
 
@@ -175,11 +186,18 @@ class Trainer:
         ----
         callbacks: list[Callback] | None
             A list of _callbacks. If None, an empty list is used.
+        stoppers : list[Stopper] | None
+            A list of user-defined stoppers, by default None.
         """
         if callbacks is None:
             callbacks = []
         self._callbacks = CallbackList(callbacks=callbacks)
         self._callbacks.set_trainer(self)
+
+        if stoppers is None:
+            stoppers = []
+        self._stoppers = StopperList(stoppers=stoppers)
+        self._stoppers.set_trainer(self)
 
     def train(self):
         """
@@ -221,6 +239,9 @@ class Trainer:
 
             if self.iteration % self.test_every == 0 and self.iteration > 0:
                 self.test_step()
+
+            if self._stoppers.should_stop():
+                break
 
         self._callbacks.on_train_end()
 
