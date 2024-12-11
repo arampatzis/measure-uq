@@ -22,50 +22,8 @@ from dataclasses import dataclass, field
 import torch
 from torch import Tensor, nn
 
-from measure_uq.utilities import LossContainer
-
-INT_INF = (1 << 32) - 1
-
-
-def extend_vector_tensor(
-    x: Tensor,
-    n: int,
-    default_value: float = 0,
-) -> Tensor:
-    """
-    Extend a given tensor to a specified size, filling with a default value
-    if necessary.
-
-    Parameters
-    ----------
-    x : Tensor
-        The tensor to extend.
-    n : int
-        The desired length of the output tensor.
-    default_value : int or float, optional
-        The default value to fill the tensor with when extending its length.
-        Defaults to 0.
-
-    Returns
-    -------
-    Tensor
-        The extended tensor, with length `N`.
-    """
-    nx = x.shape[0]
-
-    if n < 0:
-        raise ValueError("`n` cannot be negative.")
-
-    if nx == 0:
-        return torch.full((n,), default_value)
-
-    if nx <= n:
-        z = torch.empty(n)
-        z[:n] = x
-        z[n:] = x[-1]
-        return z
-
-    raise ValueError("The size of `x` cannot be greater than the size of `y`.")
+from measure_uq.typing import ArrayLike1D
+from measure_uq.utilities import INT_INF, LossContainer, extend_vector_tensor
 
 
 @dataclass(kw_only=True)
@@ -101,6 +59,11 @@ class Parameters:
             raise ValueError(
                 "The attribute `values` is None after sampling. "
                 "The `sample_values` method should assign it.",
+            )
+
+        if self.values.dim() != 2:
+            raise ValueError(
+                "The attribute `values` should be a 2D tensor. ",
             )
 
         self.values.requires_grad = True
@@ -144,6 +107,13 @@ class Condition(ABC):
                 "The attibute `points` is None after sampling."
                 "The methods `sample_points` should assign it.",
             )
+
+        if self.points.dim() != 2:
+            raise ValueError(
+                "The attribute `points` should be a 2D tensor.",
+            )
+
+        self.points.requires_grad = True
 
     def sample_points(self):
         """
@@ -224,15 +194,31 @@ class PDE(ABC):
     conditions_test: list[Condition]
     parameters_train: Parameters
     parameters_test: Parameters
-    loss_weights: Tensor = field(default_factory=Tensor)
-    resample_conditions_every: Tensor = field(default_factory=Tensor)
+    loss_weights: Tensor = field(init=False)
+    resample_conditions_every: Tensor = field(init=False)
     resample_parameters_every: int = INT_INF
 
-    def __post_init__(self):
+    def __post_init__(
+        self,
+        loss_weights: ArrayLike1D | None = None,
+        resample_conditions_every: ArrayLike1D | None = None,
+    ):
         """
         Validates and initializes attributes after dataclass construction.
         Ensures equal number of train/test conditions and initializes vectors.
         """
+        n = len(self.conditions_train)
+
+        if loss_weights is not None:
+            self.loss_weights = torch.tensor(loss_weights)
+        else:
+            self.loss_weights = torch.ones(n)
+
+        if resample_conditions_every is not None:
+            self.resample_conditions_every = torch.tensor(resample_conditions_every)
+        else:
+            self.resample_conditions_every = torch.full((n,), INT_INF)
+
         if len(self.conditions_train) != len(self.conditions_test):
             raise ValueError(
                 "The number of training and test conditions must be equal.",
@@ -240,6 +226,9 @@ class PDE(ABC):
 
         if self.loss_weights.dim() != 1:
             raise ValueError("loss_weights tensor is not a vector (1D).")
+
+        if self.resample_conditions_every.dim() != 1:
+            raise ValueError("resample_conditions_every tensor is not a vector (1D).")
 
         self.loss_weights = extend_vector_tensor(
             x=self.loss_weights,
@@ -255,7 +244,8 @@ class PDE(ABC):
 
     def loss_train(self, model: nn.Module, iteration: int):
         """
-        Computes the loss for the training conditions.
+        Computes the loss for the training conditions. Re-sample points on conditions
+        or parameters if needed.
 
         Parameters
         ----------
@@ -271,13 +261,14 @@ class PDE(ABC):
         """
         res = torch.zeros(len(self.conditions_train))
 
-        if iteration % self.resample_parameters_every == 0:
+        for i, condition in enumerate(self.conditions_train):
+            if iteration > 0 and iteration % self.resample_conditions_every[i] == 0:
+                condition.sample_points()
+
+        if iteration > 0 and iteration % self.resample_parameters_every == 0:
             self.parameters_train.sample_values()
 
         for i, condition in enumerate(self.conditions_train):
-            if iteration % self.resample_conditions_every[i] == 0:
-                condition.sample_points()
-
             res[i] = torch.mean(condition(model, self.parameters_train.values) ** 2)
             condition.loss(iteration, res[i].item())
 

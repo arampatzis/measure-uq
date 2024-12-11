@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 
 import torch
 
+INT_INF = (1 << 32) - 1
+
 
 @dataclass(kw_only=True)
 class LossContainer:
@@ -76,3 +78,47 @@ def cartesian_product_of_rows(*tensors):
         result = torch.cat([repeated_result, repeated_tensor], dim=1)
 
     return result
+
+
+def extend_vector_tensor(
+    x: torch.Tensor,
+    n: int,
+    default_value: float = 0,
+) -> torch.Tensor:
+    """
+    Extend a given tensor to a specified size, filling with a default value
+    if necessary.
+
+    Parameters
+    ----------
+    x : Tensor
+        The tensor to extend.
+    n : int
+        The desired length of the output tensor.
+    default_value : int or float, optional
+        The default value to fill the tensor with when extending its length.
+        Defaults to 0.
+
+    Returns
+    -------
+    Tensor
+        The extended tensor, with length `N`.
+    """
+    nx = x.shape[0]
+
+    if n <= 0:
+        raise ValueError("`n` must be positive.")
+
+    if nx == 0:
+        return torch.full((n,), default_value)
+
+    if nx == n:
+        return x
+
+    if nx < n:
+        z = torch.empty(n)
+        z[:n] = x
+        z[n:] = x[-1]
+        return z
+
+    raise ValueError("The size of `x` cannot be greater than the size of `y`.")

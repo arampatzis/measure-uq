@@ -6,3 +6,6 @@ temp/
 .DS_Store
 
 **/wandb/
+
+**/*.pt
+**/*.dat

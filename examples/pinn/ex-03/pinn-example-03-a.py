@@ -4,8 +4,8 @@
 Solution of the ordinary differential equation (ODE):
 
 .. math::
-    y' = p1 * y
-    y(0) = p2
+    y' = p2 * y
+    y(0) = p1
 """
 
 from copy import deepcopy

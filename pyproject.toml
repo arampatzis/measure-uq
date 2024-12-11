@@ -58,6 +58,7 @@ ignore = [
   # pylint
   "PLR0913",
   "PLR0915",
+  "PLR2004",
   # ruff
   "RUF001",
   "RUF015",
