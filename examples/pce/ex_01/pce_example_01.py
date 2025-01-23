@@ -76,7 +76,6 @@ def galerkin_pce(
     t: np.ndarray,
     joint: chaospy.Distribution,
     expansion: numpoly.baseclass.ndpoly,
-    norms: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Galerkin formulation of PCE. See also:
@@ -90,8 +89,6 @@ def galerkin_pce(
         Joint distribution of the random parameters
     expansion : chaospy.poly.Poly
         PCE expansion
-    norms : np.ndarray
-        Norms of the polynomials
 
     Returns
     -------
@@ -125,10 +122,10 @@ def galerkin_pce(
         np.ndarray
             Right-hand side of the ODE
         """
-        return -np.sum(c * e_beta_phi_phi, -1) / norms
+        return -np.sum(c * e_beta_phi_phi, -1)
 
     e_alpha_phi = chaospy.E(alpha * expansion, joint)
-    initial_condition = e_alpha_phi / norms
+    initial_condition = e_alpha_phi
 
     coefficients = odeint(
         func=right_hand_side,
@@ -166,13 +163,13 @@ def main():
 
     t = np.linspace(0, 10, 1000)
 
-    expansion, norms = chaospy.generate_expansion(3, joint, retall=True)
+    expansion = chaospy.generate_expansion(3, joint, normed=True)
 
     mean = []
     std = []
     title = []
 
-    m, s = galerkin_pce(t, joint, expansion, norms)
+    m, s = galerkin_pce(t, joint, expansion)
     mean.append(m)
     std.append(s)
     title.append("Galerkin")

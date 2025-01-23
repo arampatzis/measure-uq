@@ -19,6 +19,9 @@ module = [
 authors = ["Your Name <you@example.com>"]
 description = ""
 name = "measure-uq"
+packages = [
+  {include = "measure_uq"}
+]
 readme = "README.md"
 version = "0.1.0"
 
@@ -27,9 +30,12 @@ chaospy = "^4.3.17"
 clearml = "^1.16.4"
 deepxde = "^1.12.1"
 matplotlib = "^3.9.2"
+numpoly = "1.2.14"
 numpy = "v1.26.4"
+pytest = "^8.3.4"
 python = "^3.10"
 python-box = "^7.2.0"
+sympy = "^1.13.3"
 torch = "2.2.2"
 wandb = "^0.18.3"
 

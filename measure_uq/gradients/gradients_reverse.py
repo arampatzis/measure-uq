@@ -66,6 +66,8 @@ class JacobianReverse(Jacobian):
                 self.xs,
                 grad_outputs=torch.ones_like(y),
                 create_graph=True,
+                allow_unused=True,
+                materialize_grads=True,
             )[0]
 
         if j is None or self.dim_x == 1:

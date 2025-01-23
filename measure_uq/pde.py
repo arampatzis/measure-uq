@@ -16,13 +16,19 @@ given tensor to a specified size, filling with a default value if necessary.
 Note: The module relies on PyTorch for tensor operations and gradient
 computation.
 """
+
+# ruff: noqa: S301
+
+import pickle
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
+from pathlib import Path
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 
-from measure_uq.typing import ArrayLike1D
+from measure_uq.models import ModelWithCombinedInput
+from measure_uq.typing import ArrayLike1DFloat, ArrayLike1DInt
 from measure_uq.utilities import INT_INF, LossContainer, extend_vector_tensor
 
 
@@ -121,13 +127,13 @@ class Condition(ABC):
         This method should be implemented in subclasses or instances.
         """
 
-    def __call__(self, model: nn.Module, parameters: Tensor) -> Tensor:
+    def __call__(self, model: ModelWithCombinedInput, parameters: Tensor) -> Tensor:
         """
         Evaluates the condition for given model and parameters.
 
         Parameters
         ----------
-        model : nn.Module
+        model : ModelWithCombinedInput
             The model to evaluate the condition for.
         parameters : Tensor
             The parameters to use for evaluation.
@@ -140,23 +146,21 @@ class Condition(ABC):
         self.points.requires_grad = True
         parameters.requires_grad = True
 
-        z = model.combine_input(self.points, parameters)
+        z, y = model(self.points, parameters)
 
-        y = model(z)
-
-        return self.eval(y, z)
+        return self.eval(z, y)
 
     @abstractmethod
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Abstract method to evaluate the condition for given output and input.
 
         Parameters
         ----------
-        y : Tensor
-            The output of the model.
         x : Tensor
             The input of the model.
+        y : Tensor
+            The output of the model.
 
         Returns
         -------
@@ -169,39 +173,49 @@ class Condition(ABC):
 @dataclass(kw_only=True)
 class PDE(ABC):
     """
-    Abstract base class for representing partial differential equations (PDEs)
-    within a physics-informed machine learning framework.
+    Abstract base class for physics-informed neural networks (PINNs) for PDEs.
+
+    Parameters
+    ----------
+    conditions_train : list[Condition]
+        A list of conditions to be satisfied by the model during training.
+    conditions_test : list[Condition]
+        A list of conditions to be satisfied by the model during testing.
+    parameters_train : Parameters
+        Parameters for the model during training.
+    parameters_test : Parameters
+        Parameters for the model during testing.
+    loss_weights : Optional[ArrayLike1DFloat], optional
+        Loss weights for conditions. If not given, equal weights are assigned.
+        by default None
+    resample_conditions_every : Optional[ArrayLike1DInt], optional
+        The number of iterations between resampling points for each condition.
+        If not given, parameters are sampled once at the beginning.
+        by default None
 
     Attributes
     ----------
-    conditions_train : list[Condition]
-        A list of conditions to be satisfied during the training phase.
-    conditions_test : list[Condition]
-        A list of conditions to be satisfied during the testing phase.
-    parameters_train : Parameters
-        Parameters used during training.
-    parameters_test : Parameters
-        Parameters used during testing.
-    loss_weights : Optional[Tensor]
-        Weights applied to each condition's loss contribution.
-    resample_conditions_every : Optional[Tensor]
-        Frequency at which conditions are resampled.
-    resample_parameters_every : Optional[int]
-        Frequency at which parameters are resampled.
+    loss_weights_ : Tensor
+        The loss weights as a tensor.
+    resample_conditions_every_ : Tensor
+        The number of iterations between resampling points as a tensor.
     """
 
     conditions_train: list[Condition]
     conditions_test: list[Condition]
     parameters_train: Parameters
     parameters_test: Parameters
-    loss_weights: Tensor = field(init=False)
-    resample_conditions_every: Tensor = field(init=False)
+    loss_weights_: Tensor = field(init=False)
+    resample_conditions_every_: Tensor = field(init=False)
     resample_parameters_every: int = INT_INF
+
+    loss_weights: InitVar[ArrayLike1DFloat | None] = None
+    resample_conditions_every: InitVar[ArrayLike1DInt | None] = None
 
     def __post_init__(
         self,
-        loss_weights: ArrayLike1D | None = None,
-        resample_conditions_every: ArrayLike1D | None = None,
+        loss_weights: ArrayLike1DFloat | None = None,
+        resample_conditions_every: ArrayLike1DInt | None = None,
     ):
         """
         Validates and initializes attributes after dataclass construction.
@@ -210,46 +224,54 @@ class PDE(ABC):
         n = len(self.conditions_train)
 
         if loss_weights is not None:
-            self.loss_weights = torch.tensor(loss_weights)
+            if not isinstance(loss_weights, Tensor):
+                self.loss_weights_ = torch.tensor(loss_weights)
+            else:
+                self.loss_weights_ = loss_weights
         else:
-            self.loss_weights = torch.ones(n)
+            self.loss_weights_ = torch.ones(n)
 
         if resample_conditions_every is not None:
-            self.resample_conditions_every = torch.tensor(resample_conditions_every)
+            if not isinstance(resample_conditions_every, Tensor):
+                self.resample_conditions_every_ = torch.tensor(
+                    resample_conditions_every,
+                )
+            else:
+                self.resample_conditions_every_ = resample_conditions_every
         else:
-            self.resample_conditions_every = torch.full((n,), INT_INF)
+            self.resample_conditions_every_ = torch.full((n,), INT_INF)
 
         if len(self.conditions_train) != len(self.conditions_test):
             raise ValueError(
                 "The number of training and test conditions must be equal.",
             )
 
-        if self.loss_weights.dim() != 1:
-            raise ValueError("loss_weights tensor is not a vector (1D).")
+        if self.loss_weights_.dim() != 1:
+            raise ValueError("loss_weights_ tensor is not a vector (1D).")
 
-        if self.resample_conditions_every.dim() != 1:
-            raise ValueError("resample_conditions_every tensor is not a vector (1D).")
+        if self.resample_conditions_every_.dim() != 1:
+            raise ValueError("resample_conditions_every_ tensor is not a vector (1D).")
 
-        self.loss_weights = extend_vector_tensor(
-            x=self.loss_weights,
+        self.loss_weights_ = extend_vector_tensor(
+            x=self.loss_weights_,
             n=len(self.conditions_train),
             default_value=1.0,
         )
 
-        self.resample_conditions_every = extend_vector_tensor(
-            x=self.resample_conditions_every,
+        self.resample_conditions_every_ = extend_vector_tensor(
+            x=self.resample_conditions_every_,
             n=len(self.conditions_train),
             default_value=INT_INF,
         )
 
-    def loss_train(self, model: nn.Module, iteration: int):
+    def loss_train(self, model: ModelWithCombinedInput, iteration: int):
         """
         Computes the loss for the training conditions. Re-sample points on conditions
         or parameters if needed.
 
         Parameters
         ----------
-        model : nn.Module
+        model : ModelWithCombinedInput
             The model to evaluate the conditions for.
         iteration : int
             The current training iteration.
@@ -262,7 +284,7 @@ class PDE(ABC):
         res = torch.zeros(len(self.conditions_train))
 
         for i, condition in enumerate(self.conditions_train):
-            if iteration > 0 and iteration % self.resample_conditions_every[i] == 0:
+            if iteration > 0 and iteration % self.resample_conditions_every_[i] == 0:
                 condition.sample_points()
 
         if iteration > 0 and iteration % self.resample_parameters_every == 0:
@@ -272,15 +294,15 @@ class PDE(ABC):
             res[i] = torch.mean(condition(model, self.parameters_train.values) ** 2)
             condition.loss(iteration, res[i].item())
 
-        return torch.dot(self.loss_weights, res)
+        return torch.dot(self.loss_weights_, res)
 
-    def loss_test(self, model: nn.Module, iteration: int = 0):
+    def loss_test(self, model: ModelWithCombinedInput, iteration: int = 0):
         """
         Computes the loss for the testing conditions.
 
         Parameters
         ----------
-        model : nn.Module
+        model : ModelWithCombinedInput
             The model to evaluate the conditions for.
         iteration : int, optional
             The current testing iteration (default is 0).
@@ -296,4 +318,34 @@ class PDE(ABC):
             res[i] = torch.mean(condition(model, self.parameters_test.values) ** 2)
             condition.loss(iteration, res[i].item())
 
-        return torch.dot(self.loss_weights, res)
+        return torch.dot(self.loss_weights_, res)
+
+    def save(self, filename: str | Path = "pde.pickle"):
+        """
+        Saves the PDE to a file using pickling.
+
+        Parameters
+        ----------
+        filename : str | Path
+            The name of the file to save the PDE to, by default "pde.pickle".
+        """
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, filename: str | Path):
+        """
+        Loads a PDE instance from a file using pickling.
+
+        Parameters
+        ----------
+        filename : str | Path
+            The name of the file from which to load the PDE instance.
+
+        Returns
+        -------
+        PDE
+            The loaded PDE instance.
+        """
+        with open(filename, "rb") as f:
+            return pickle.load(f)

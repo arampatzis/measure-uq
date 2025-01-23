@@ -1,34 +1,13 @@
-#!/usr/bin/env python3
+"""Definition of the ode and its parameters"""
 
-r"""
-Solves the second-order ODE:
-
-.. math::
-    y'' = p_1 \\cdot y
-
-with the boundary conditions:
-
-.. math::
-    y(0) = p_2
-    y(1) = p_3
-"""
-
-from copy import deepcopy
 from dataclasses import dataclass
 
-import matplotlib.pyplot as plt
 import numpy as np
-import torch
-from torch import Tensor, optim, tensor
+from torch import Tensor
 
 from measure_uq.callbacks import Callback
 from measure_uq.gradients import jacobian
-from measure_uq.models import PINN
-from measure_uq.pde import PDE, Condition, Parameters
-from measure_uq.plots import plot_losses, plot_ode_on_grid
-from measure_uq.trainers.trainer import Trainer
-from measure_uq.trainers.trainer_data import TrainerData
-from measure_uq.utilities import cartesian_product_of_rows
+from measure_uq.pde import Condition
 
 
 def analytical_solution(t: float | np.ndarray, p: list | tuple):
@@ -81,14 +60,14 @@ def analytical_solution(t: float | np.ndarray, p: list | tuple):
 class Condition1(Condition):
     """Residual of the ODE."""
 
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Parameters
         ----------
-        y : Tensor
-            Value of y at the points.
         x : Tensor
-            Points.
+            The input tensor.
+        y : Tensor
+            The solution tensor.
 
         Returns
         -------
@@ -110,14 +89,14 @@ class Condition1(Condition):
 class Condition2(Condition):
     """Condition for the first boundary condition."""
 
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Parameters
         ----------
-        y : Tensor
-            Value of y at the points.
         x : Tensor
-            Points.
+            The input tensor.
+        y : Tensor
+            The solution tensor.
 
         Returns
         -------
@@ -133,7 +112,7 @@ class Condition2(Condition):
 class Condition3(Condition):
     """Condition for the second boundary condition."""
 
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Evaluates the condition at the given points.
 
@@ -177,84 +156,3 @@ class CallbackLog(Callback):
                 f"{self.trainer_data.losses_train.index[-1]:10}:  "
                 f"{self.trainer_data.losses_train.values[-1]:.5e}",
             )
-
-
-def main():
-    """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
-
-    This function initializes the model, defines the conditions and parameters
-    for training and testing, and trains the model using the specified optimizer
-    and callbacks.
-    """
-    model = PINN([4, 40, 40, 1])
-
-    conditions_train = [
-        Condition1(points=torch.linspace(0, 2, 101).reshape(-1, 1)),
-        Condition2(points=tensor([[0.0]])),
-        Condition3(points=tensor([[1.0]])),
-    ]
-    conditions_test = deepcopy(conditions_train)
-
-    parameters_train = Parameters(
-        values=cartesian_product_of_rows(
-            tensor(
-                [
-                    [1.0],
-                    [2.0],
-                    [3.0],
-                    [-1.0],
-                    [-2.0],
-                    [-3.0],
-                ],
-            ),
-            tensor(
-                [
-                    [1.0, 0.0],
-                    [0.0, 1.0],
-                    [1.0, 1.0],
-                ],
-            ),
-        ),
-    )
-    parameters_test = deepcopy(parameters_train)
-
-    pde = PDE(
-        conditions_train=conditions_train,
-        conditions_test=conditions_test,
-        parameters_train=parameters_train,
-        parameters_test=parameters_test,
-        loss_weights=torch.tensor([10.0, 1.0, 1.0]),
-    )
-
-    trainer_data = TrainerData(
-        pde=pde,
-        iterations=400,
-        model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=50, history_size=10),
-    )
-
-    trainer = Trainer(
-        trainer_data=trainer_data,
-        callbacks=[CallbackLog(trainer_data=trainer_data, print_every=100)],
-    )
-
-    trainer.train()
-
-    fig1, ax1 = plot_losses(trainer_data)
-
-    fig2, ax2 = plot_ode_on_grid(
-        model=model,
-        t=torch.linspace(0, 2, 100)[:, None],
-        parameters=parameters_test,
-        analytical_solution=analytical_solution,
-        approximate_solution=lambda t, p: model(model.combine_input(t, p[None, :])),
-        figsize=(20, 10),
-    )
-
-    plt.show()
-
-
-if __name__ == "__main__":
-    main()

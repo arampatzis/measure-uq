@@ -1,28 +1,14 @@
-#!/usr/bin/env python3
+"""Definition of the ode and its parameters"""
 
-"""
-Solution of the ordinary differential equation (ODE):
-
-.. math::
-    y' = p2 * y
-    y(0) = p1
-"""
-
-from copy import deepcopy
 from dataclasses import dataclass
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch import Tensor, optim, tensor
+from torch import Tensor
 
 from measure_uq.callbacks import Callback
 from measure_uq.gradients import jacobian
-from measure_uq.models import PINN
-from measure_uq.pde import PDE, Condition, Parameters
-from measure_uq.plots import plot_losses
-from measure_uq.trainers.trainer import Trainer
-from measure_uq.trainers.trainer_data import TrainerData
+from measure_uq.pde import Condition, Parameters
 
 
 def analytical_solution(t: float | np.ndarray, p: list | tuple):
@@ -52,16 +38,16 @@ def analytical_solution(t: float | np.ndarray, p: list | tuple):
 class Condition1(Condition):
     """Represents the residual of the ODE."""
 
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Evaluate the residual.
 
         Parameters
         ----------
-        y : Tensor
-            The solution tensor.
         x : Tensor
             The input tensor.
+        y : Tensor
+            The solution tensor.
 
         Returns
         -------
@@ -79,20 +65,33 @@ class Condition1(Condition):
 
 
 @dataclass(kw_only=True)
+class Condition1WithResampling(Condition1):
+    """Represents the residual of the ODE."""
+
+    N: int
+
+    def sample_points(self):
+        """Sample random points for the ODE residual evaluation."""
+        print("Re-sample ODE variables for Condition1")
+
+        self.points = torch.from_numpy(np.random.uniform(0, 1, (self.N, 1))).float()
+
+
+@dataclass(kw_only=True)
 class Condition2(Condition):
     """Represents the initial condition of the ODE."""
 
-    def eval(self, y: Tensor, x: Tensor) -> Tensor:
+    def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Evaluate the initial condition by computing the difference between the
         derivative and the given value.
 
         Parameters
         ----------
-        y : Tensor
-            The solution tensor.
         x : Tensor
             The input tensor.
+        y : Tensor
+            The solution tensor.
 
         Returns
         -------
@@ -137,6 +136,7 @@ class RandomParameters(Parameters):
             range [1, 3], and the second column contains values sampled from
             a uniform distribution in the range [-2, 1].
         """
+        print("Re-sample ODE parameters")
         self.values = torch.cat(
             (
                 torch.from_numpy(np.random.uniform(1, 3, (self.N, 1))).float(),
@@ -162,57 +162,3 @@ class CallbackLog(Callback):
                 f"{self.trainer_data.losses_train.index[-1]:10}:  "
                 f"{self.trainer_data.losses_train.values[-1]:.5e}",
             )
-
-
-def main():
-    """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
-
-    This function initializes the model, defines the conditions and parameters
-    for training and testing, and trains the model using the specified optimizer
-    and callbacks.
-    """
-    model = PINN([3, 20, 20, 20, 20, 1])
-
-    conditions_train = [
-        Condition1(points=torch.linspace(0, 2, 101).reshape(-1, 1)),
-        Condition2(points=tensor([[0.0]])),
-    ]
-    conditions_test = deepcopy(conditions_train)
-
-    parameters_train = RandomParameters(N=20)
-    parameters_test = RandomParameters(N=100)
-
-    pde = PDE(
-        conditions_train=conditions_train,
-        conditions_test=conditions_test,
-        parameters_train=parameters_train,
-        parameters_test=parameters_test,
-        resample_parameters_every=1000,
-    )
-
-    trainer_data = TrainerData(
-        pde=pde,
-        iterations=10000,
-        model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=50, history_size=10, lr=0.5),
-        test_every=10,
-    )
-
-    trainer = Trainer(
-        trainer_data=trainer_data,
-        callbacks=[
-            CallbackLog(trainer_data=trainer_data, print_every=100),
-        ],
-    )
-
-    trainer.train()
-
-    fig1, ax1 = plot_losses(trainer_data)
-
-    plt.show()
-
-
-if __name__ == "__main__":
-    main()

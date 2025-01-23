@@ -54,7 +54,7 @@ class SimpleNN(nn.Module):
         return self.activation[1](self.fc[1](x))
 
 
-def main():
+def compare_gradients():
     """Main function to execute the computation and visualization of gradients."""
     nx = 3
     ny = 2
@@ -72,8 +72,16 @@ def main():
 
     y = model(x)
 
+    z = torch.linspace(
+        100,
+        200,
+        1000,
+    )[:, None]
+
+    xx = torch.cat((x, z), dim=1)
+
     computed_gradients = torch.stack(
-        [jacobian(y, x, i=i) for i in range(ny)],
+        [jacobian(y, xx, i=i) for i in range(ny)],
         dim=1,
     )
 
@@ -129,6 +137,11 @@ def main():
 
     plt.tight_layout()
     plt.show()
+
+
+def main():
+    """Entry point of the script."""
+    compare_gradients()
 
 
 if __name__ == "__main__":
