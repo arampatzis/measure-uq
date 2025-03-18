@@ -10,11 +10,7 @@ in the context of physics-informed machine learning. The module includes:
   satisfy. This class includes a `loss` attribute for tracking the loss values
   related to the condition.
 
-Additionally, a utility function `extend_vector_tensor` is provided to extend a
-given tensor to a specified size, filling with a default value if necessary.
-
-Note: The module relies on PyTorch for tensor operations and gradient
-computation.
+Note: The module relies on PyTorch for tensor operations and gradient computation.
 """
 
 # ruff: noqa: S301
@@ -329,6 +325,7 @@ class PDE(ABC):
         filename : str | Path
             The name of the file to save the PDE to, by default "pde.pickle".
         """
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
         with open(filename, "wb") as f:
             pickle.dump(self, f)
 

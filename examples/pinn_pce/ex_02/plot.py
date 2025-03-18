@@ -71,12 +71,12 @@ def main():
     mean = yyy[:, 0]
     std = np.sqrt(np.sum(yyy**2, axis=1))
 
-    # ax[2].plot(t, mean, label="1st coefficient")
-    ax[2].plot(t, ymean_c, "-", label="Monte Carlo")
+    ax[2].plot(t, mean, label="1st coefficient")
+    ax[2].plot(t, ymean_c, "-.", label="Monte Carlo")
     ax[2].plot(t, ymean_ex, "--", label="exact")
 
-    # ax[3].plot(t, std, label="sum of coefficient")
-    ax[3].plot(t, ystd_c, "-", label="Monte Carlo")
+    ax[3].plot(t, std, label="sum of coefficient")
+    ax[3].plot(t, ystd_c, "-.", label="Monte Carlo")
     ax[3].plot(t, ystd_ex, "--", label="exact")
 
     for a in ax:

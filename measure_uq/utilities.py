@@ -117,8 +117,8 @@ def extend_vector_tensor(
 
     if nx < n:
         z = torch.empty(n)
-        z[:n] = x
-        z[n:] = x[-1]
+        z[:nx] = x
+        z[nx:] = x[-1]
         return z
 
     raise ValueError("The size of `x` cannot be greater than the size of `y`.")

@@ -6,7 +6,9 @@ temp/
 .DS_Store
 
 **/wandb/
+**/data/
 
 **/*.pt
 **/*.dat
 **/*.pickle
+**/*.npz

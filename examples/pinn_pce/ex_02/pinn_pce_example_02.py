@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 """
-Solution of the ordinary differential equation (ODE):
+Solution of the heat equation on the line:
 
 .. math::
-    y' = p1 * y
-    y(0) = p2
+    u_t - a / k^2 u_xx = 0
+    u(0, x) = \sin(k x)
+    u(t, 0) = 0
+    u(t, \pi) = exp(-a t) \sin(\pi k)
 """
 
 # ruff: noqa: D103
@@ -15,6 +17,7 @@ from copy import deepcopy
 import chaospy
 import matplotlib.pyplot as plt
 from torch import optim
+import torch
 
 from measure_uq.models import PINN_PCE
 from measure_uq.pde import PDE
@@ -22,13 +25,19 @@ from measure_uq.plots import plot_losses
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
-from .pde import CallbackLog, Condition1, Condition2, RandomParameters
+from chaospy import J
+from pde import CallbackLog, RandomParameters
+from pde import Residual, InitialCondition, BoundaryConditionLeft, BoundaryConditionRight
 
 
 def main():
-    joint = chaospy.J(
+    
+    torch.set_num_threads(12)
+    torch.set_num_interop_threads(24)
+    
+    joint = J(
         chaospy.Uniform(1, 3),
-        chaospy.Uniform(-2, 1),
+        chaospy.Uniform(1, 3),
     )
 
     expansion = chaospy.generate_expansion(
@@ -43,8 +52,10 @@ def main():
     )
 
     conditions_train = [
-        Condition1(N=100),
-        Condition2(),
+        Residual(Nt=20, Nx=50),
+        InitialCondition(Nx=50),
+        BoundaryConditionLeft(Nt=20),
+        BoundaryConditionRight(Nt=20),
     ]
     conditions_test = deepcopy(conditions_train)
 
