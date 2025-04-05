@@ -140,7 +140,7 @@ def galerkin_pce(
     return mean, std
 
 
-def main():
+def main() -> None:
     """
     Run the main function of the script.
 

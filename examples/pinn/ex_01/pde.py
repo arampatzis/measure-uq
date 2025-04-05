@@ -11,7 +11,7 @@ from measure_uq.gradients import jacobian
 from measure_uq.pde import Condition
 
 
-def analytical_solution(t: float | np.ndarray, p: list | tuple):
+def analytical_solution(t: float | np.ndarray, p: list | tuple) -> np.ndarray:
     """
     Compute the exact solution for the ODE dy/dt = p1 * y, y(0) = p2.
 
@@ -96,13 +96,13 @@ class CallbackLog(Callback):
 
     print_every: int = 100
 
-    def on_iteration_end(self):
+    def on_iteration_end(self) -> None:
         """Prints the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
             or self.trainer_data.iteration == self.trainer_data.iterations - 1
         ):
             print(
-                f"{self.trainer_data.losses_train.index[-1]:10}:  "
-                f"{self.trainer_data.losses_train.values[-1]:.5e}",
+                f"{self.trainer_data.losses_train.i[-1]:10}:  "
+                f"{self.trainer_data.losses_train.v[-1]:.5e}",
             )

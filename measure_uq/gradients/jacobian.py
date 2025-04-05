@@ -18,6 +18,8 @@ Original source: https://github.com/lululxvi/deepxde
 
 from abc import ABC, abstractmethod
 
+import torch
+
 
 class Jacobian(ABC):
     """
@@ -32,24 +34,25 @@ class Jacobian(ABC):
         xs: Input Tensor of shape (batch_size, dim_x).
     """
 
-    def __init__(self, ys, xs):
+    def __init__(self, ys: torch.Tensor, xs: torch.Tensor) -> None:
         self.ys = ys
         self.xs = xs
 
         self.dim_y = ys.shape[1]
         self.dim_x = xs.shape[1]
 
-        self.J = {}
+        self.J: dict[int | tuple[int, int], torch.Tensor] = {}
 
     @abstractmethod
-    def __call__(self, i=None, j=None):
+    def __call__(self, i: int | None = None, j: int | None = None) -> torch.Tensor:
         """
         Returns (`i`, `j`)th entry J[`i`, `j`].
 
         - If `i` is ``None``, returns the jth column J[:, `j`].
         - If `j` is ``None``, returns the ith row J[`i`, :], i.e., the gradient of y_i.
         - `i` and `j` cannot be both ``None``.
-        """
+
+        Add these checks to the __call__ method:
         if i is None and j is None:
             if self.dim_x > 1 or self.dim_y > 1:
                 raise ValueError("i and j cannot be both None.")
@@ -57,8 +60,8 @@ class Jacobian(ABC):
             j = 0
         if i is not None and not 0 <= i < self.dim_y:
             raise ValueError(f"i={i} is not valid.")
-        if j is not None and not 0 <= j < self.dim_x:
-            raise ValueError(f"j={j} is not valid.")
+        """
+        raise NotImplementedError("This method should be implemented by the subclass.")
 
 
 class Jacobians:
@@ -74,7 +77,13 @@ class Jacobians:
         self.jacobian_class = jacobian_class
         self.Js: dict = {}
 
-    def __call__(self, ys, xs, i=None, j=None):
+    def __call__(
+        self,
+        ys: torch.Tensor,
+        xs: torch.Tensor,
+        i: int | None = None,
+        j: int | None = None,
+    ) -> torch.Tensor:
         """
         For backend tensorflow and pytorch, self.Js cannot be reused across iteration.
         For backend pytorch, we need to reset self.Js in each iteration to avoid
@@ -106,6 +115,6 @@ class Jacobians:
             self.Js[key] = self.jacobian_class(ys, xs)
         return self.Js[key](i, j)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear cached Jacobians."""
         self.Js = {}

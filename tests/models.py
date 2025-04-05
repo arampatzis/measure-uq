@@ -4,6 +4,7 @@ Unit tests for the models module.
 This module contains unit tests for the models module of measure-uq.
 """
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -27,29 +28,25 @@ class MockModule(torch.nn.Module):
         The mock object for the forward method of the module.
     """
 
-    def __init__(self, return_value):
+    def __init__(self, return_value: torch.Tensor) -> None:
         super().__init__()
         self._mock = MagicMock()
         self._mock.return_value = return_value
 
-    def forward(self, *args, **kwargs):
+    def forward(self, *args: Any, **kwargs: Any) -> torch.Tensor:
         """Mocks the forward method."""
         return self._mock(*args, **kwargs)
 
-    def assert_called_with(self, *args, **kwargs):
+    def assert_called_with(self, *args: Any, **kwargs: Any) -> None:
         """Asserts that the forward method was called with the correct arguments."""
         self._mock.assert_called_with(*args, **kwargs)
 
 
-def test_pinn_pce():
+def test_pinn_pce() -> None:
     """
     Test the evaluation of the Physics Informed Neural Network with a Polynomial
     Chaos Expansion (PINN_PCE).
 
-    The test case is set up as follows: We set the evaluation of the basis
-    functions in the expansion to be equal to the input, and we set the output of
-    each network to be equal to the input. We then evaluate the model and check
-    that it is equal to the product of the input with the single expansion.
 
     Input/Output of the NN: [-1, 2, -3]
     Expansion:[...]
@@ -81,8 +78,7 @@ def test_pinn_pce():
         dtype=torch.float32,
     ).view(-1, 1)
 
-    for i in range(len(model.networks)):
-        model.networks[i] = MockModule(x)
+    model.net = MockModule(x)
 
     # These values are irrelevant for this test
     p = torch.zeros((Nsp, Np), dtype=torch.float32)

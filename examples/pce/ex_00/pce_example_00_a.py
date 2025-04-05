@@ -6,13 +6,14 @@
 import chaospy
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 
 plt.rc("figure", figsize=[16, 10])
 
 
-def main():
-    grid = np.mgrid[-2.0:2.0:100j, -2.0:2.0:100j]
+def main() -> None:
+    x = np.linspace(-2.0, 2.0, 100)
+    y = np.linspace(-2.0, 2.0, 100)
+    grid = np.meshgrid(x, y)
 
     fig, ax = plt.subplots(1, 2)
     ax.flatten()
@@ -25,7 +26,7 @@ def main():
         ],
     )
 
-    ax[0].contourf(grid[0], grid[1], joint.pdf(grid), 30, cmap=cm.jet)
+    ax[0].contourf(grid[0], grid[1], joint.pdf(grid), 30, cmap=plt.get_cmap("jet"))
     ax[0].scatter(*joint.sample(100, rule="random"))
     ax[0].set_aspect("equal", adjustable="box")
 
@@ -36,7 +37,7 @@ def main():
 
     f = expansion[6](*grid)
 
-    c1 = ax[1].contourf(grid[0], grid[1], f, 30, cmap=cm.jet)
+    c1 = ax[1].contourf(grid[0], grid[1], f, 30, cmap=plt.get_cmap("jet"))
     ax[1].set_aspect("equal", adjustable="box")
     fig.colorbar(c1, ax=ax[1])
     plt.show()

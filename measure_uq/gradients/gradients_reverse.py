@@ -21,7 +21,7 @@ from .jacobian import Jacobian, Jacobians
 
 
 class JacobianReverse(Jacobian):
-    def __init__(self, ys, xs):
+    def __init__(self, ys: torch.Tensor, xs: torch.Tensor) -> None:
         self.ys = ys
         self.xs = xs
 
@@ -30,7 +30,7 @@ class JacobianReverse(Jacobian):
 
         self.J = {}
 
-    def __call__(self, i=None, j=None):
+    def __call__(self, i: int | None = None, j: int | None = None) -> torch.Tensor:
         """
         Returns (`i`, `j`)th entry J[`i`, `j`].
 
@@ -83,7 +83,12 @@ class JacobianReverse(Jacobian):
 _Jacobians = Jacobians(JacobianReverse)
 
 
-def jacobian(ys, xs, i=None, j=None):
+def jacobian(
+    ys: torch.Tensor,
+    xs: torch.Tensor,
+    i: int | None = None,
+    j: int | None = None,
+) -> torch.Tensor:
     """
     Compute the Jacobian matrix of the output tensor with respect to the input tensor.
 
@@ -122,7 +127,7 @@ class Hessian:
     pairs, it reuses cached results to avoid duplicate computations.
     """
 
-    def __init__(self, ys, xs, component=0):
+    def __init__(self, ys: torch.Tensor, xs: torch.Tensor, component: int = 0) -> None:
         dim_y = ys.shape[1]
 
         if component >= dim_y:
@@ -137,7 +142,7 @@ class Hessian:
         grad_y = jacobian(ys, xs, i=component, j=None)
         self.H = JacobianReverse(grad_y, xs)
 
-    def __call__(self, i=0, j=0):
+    def __call__(self, i: int = 0, j: int = 0) -> torch.Tensor:
         """Returns H[`i`, `j`]."""
         return self.H(j, i)
 
@@ -151,10 +156,17 @@ class Hessians:
     rather than creating a new one.
     """
 
-    def __init__(self):
-        self.Hs = {}
+    def __init__(self) -> None:
+        self.Hs: dict[tuple[torch.Tensor, torch.Tensor, int], Hessian] = {}
 
-    def __call__(self, ys, xs, component=0, i=0, j=0):
+    def __call__(
+        self,
+        ys: torch.Tensor,
+        xs: torch.Tensor,
+        component: int = 0,
+        i: int = 0,
+        j: int = 0,
+    ) -> torch.Tensor:
         """
         Compute the Hessian entry
 
@@ -189,7 +201,7 @@ class Hessians:
             self.Hs[key] = Hessian(ys, xs, component=component)
         return self.Hs[key](i, j)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear cached Hessians."""
         self.Hs = {}
 
@@ -197,7 +209,13 @@ class Hessians:
 _Hessians = Hessians()
 
 
-def hessian(ys, xs, component=0, i=0, j=0):
+def hessian(
+    ys: torch.Tensor,
+    xs: torch.Tensor,
+    component: int = 0,
+    i: int = 0,
+    j: int = 0,
+) -> torch.Tensor:
     """
     Compute the Hessian matrix entry H[i, j] = d^2y / dx_i dx_j for the specified
     component of the output tensor, using reverse-mode autodiff.
@@ -221,7 +239,7 @@ def hessian(ys, xs, component=0, i=0, j=0):
     return _Hessians(ys, xs, component=component, i=i, j=j)
 
 
-def clear():
+def clear() -> None:
     """Clear cached Jacobians and Hessians."""
     _Jacobians.clear()
     _Hessians.clear()

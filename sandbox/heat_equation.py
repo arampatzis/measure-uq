@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 
 import numpy as np
-
-from sympy import symbols, simplify
-from sympy import sin, exp
-from sympy.plotting import plot, plot3d
-
+from sympy import exp, simplify, sin, symbols
+from sympy.plotting import plot3d
 
 t, x, a, b, k, u1, u2, L, pi, y = symbols("t,x,a,b,k,u1,u2,L,pi,y")
 
 # u = u1 + x*(u2 - u1)/L + sin(k*x) * exp(-b*t)
 # print("\nu_t - b u_xx = ", u.diff(t) - b*u.diff(x).diff(x)/(k**2))
 
-u = sin(k*x) * exp(-b*t)
-print("u_t - b/k^2 u_xx = ", simplify(u.diff(t) - (b/k**2)*u.diff(x).diff(x)))
+u = sin(k * x) * exp(-b * t)
+print("u_t - b/k^2 u_xx = ", simplify(u.diff(t) - (b / k**2) * u.diff(x).diff(x)))
 
 print("\nu(t,0)       = ", u.subs(x, 0))
 print("u(t,L)       = ", u.subs(x, L))

@@ -14,10 +14,17 @@ Original source: https://github.com/lululxvi/deepxde
 
 __all__ = ["hessian", "jacobian"]
 
+import torch
+
 from . import gradients_reverse
 
 
-def jacobian(ys, xs, i=None, j=None):
+def jacobian(
+    ys: torch.Tensor,
+    xs: torch.Tensor,
+    i: int | None = None,
+    j: int | None = None,
+) -> torch.Tensor:
     """
     Compute `Jacobian matrix <https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant>`_
     J as J[i, j] = dy_i / dx_j, where i = 0, ..., dim_y - 1 and j = 0, ..., dim_x - 1.
@@ -46,7 +53,13 @@ def jacobian(ys, xs, i=None, j=None):
     return gradients_reverse.jacobian(ys, xs, i=i, j=j)
 
 
-def hessian(ys, xs, component=0, i=0, j=0):
+def hessian(
+    ys: torch.Tensor,
+    xs: torch.Tensor,
+    component: int = 0,
+    i: int = 0,
+    j: int = 0,
+) -> torch.Tensor:
     """
     Compute `Hessian matrix <https://en.wikipedia.org/wiki/Hessian_matrix>`_ H as
     H[i, j] = d^2y / dx_i dx_j, where i,j = 0, ..., dim_x - 1.
@@ -73,6 +86,6 @@ def hessian(ys, xs, component=0, i=0, j=0):
     return gradients_reverse.hessian(ys, xs, component=component, i=i, j=j)
 
 
-def clear():
+def clear() -> None:
     """Clear cached Jacobians and Hessians."""
     gradients_reverse.clear()

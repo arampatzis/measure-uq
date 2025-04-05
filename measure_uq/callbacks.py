@@ -35,27 +35,27 @@ class Callback:
         The `TrainerData` instance containing the data of the trainer.
     """
 
-    trainer_data: TrainerData | None = None
+    trainer_data: TrainerData
 
-    def init(self):
+    def init(self) -> None:
         """Init after setting a trainer."""
 
-    def on_iteration_begin(self):
+    def on_iteration_begin(self) -> None:
         """Called at the beginning of every iteration."""
 
-    def on_teration_end(self):
+    def on_iteration_end(self) -> None:
         """Called at the end of every iteration."""
 
-    def on_train_begin(self):
+    def on_train_begin(self) -> None:
         """Called at the beginning of trainer training."""
 
-    def on_train_end(self):
+    def on_train_end(self) -> None:
         """Called at the end of trainer training."""
 
-    def on_predict_begin(self):
+    def on_predict_begin(self) -> None:
         """Called at the beginning of prediction."""
 
-    def on_predict_end(self):
+    def on_predict_end(self) -> None:
         """Called at the end of prediction."""
 
 
@@ -76,37 +76,37 @@ class CallbackList:
 
     callbacks: list[Callback]
 
-    def init(self):
+    def init(self) -> None:
         """Initialize each callback in the list."""
         for callback in self.callbacks:
             callback.init()
 
-    def on_iteration_begin(self):
+    def on_iteration_begin(self) -> None:
         """Called at the beginning of every iteration."""
         for callback in self.callbacks:
             callback.on_iteration_begin()
 
-    def on_iteration_end(self):
+    def on_iteration_end(self) -> None:
         """Called at the end of every iteration."""
         for callback in self.callbacks:
             callback.on_iteration_end()
 
-    def on_train_begin(self):
+    def on_train_begin(self) -> None:
         """Called at the beginning of trainer training."""
         for callback in self.callbacks:
             callback.on_train_begin()
 
-    def on_train_end(self):
+    def on_train_end(self) -> None:
         """Called at the end of trainer training."""
         for callback in self.callbacks:
             callback.on_train_end()
 
-    def on_predict_begin(self):
+    def on_predict_begin(self) -> None:
         """Called at the beginning of prediction."""
         for callback in self.callbacks:
             callback.on_predict_begin()
 
-    def on_predict_end(self):
+    def on_predict_end(self) -> None:
         """Called at the end of prediction."""
         for callback in self.callbacks:
             callback.on_predict_end()

@@ -1,13 +1,18 @@
 """
-Defines a `Trainer` class for managing the training process of a machine
-learning model using callbacks and stoppers.
+Trainer module
+
+This module provides the Trainer class for managing the training process of models
+in the measure-uq package.
+
+The Trainer class handles the training loop, including callbacks for monitoring and
+logging, as well as stopping criteria to determine when training should end.
 
 Classes
 -------
 Trainer
-    A class for handling the training process with customizable callbacks and stopping
-    criteria.
+    A class to manage the training process with callbacks and stopping criteria.
 """
+
 from dataclasses import InitVar, dataclass, field
 
 from measure_uq.callbacks import Callback, CallbackList
@@ -60,20 +65,28 @@ class Trainer:
 
     def __post_init__(
         self,
-        callbacks: list[Callback] | None,
-        stoppers: list[Stopper] | None,
-    ):
+        callbacks: list[Callback] | None = None,
+        stoppers: list[Stopper] | None = None,
+    ) -> None:
         """
         Initializes the trainer after construction.
 
-        Sets the `_callbacks` attribute and sets the trainer for each callback.
+        Parameters
+        ----------
+        callbacks : list[Callback] | None, optional
+            A list of callbacks to handle events during training. If None, an empty list
+            is used.
+        stoppers : list[Stopper] | None, optional
+            A list of stoppers to handle stopping criteria during training. If None,
+            an empty list is used.
 
-        Args:
-        ----
-        callbacks: list[Callback] | None
-            A list of _callbacks. If None, an empty list is used.
-        stoppers : list[Stopper] | None
-            A list of user-defined stoppers, by default None.
+        Notes
+        -----
+        This method:
+        - Initializes the callback list and sets up each callback
+        - Initializes the stopper list
+        - Both callbacks and stoppers are stored in internal attributes
+        (_callbacks and _stoppers)
         """
         if callbacks is None:
             callbacks = []
@@ -84,35 +97,23 @@ class Trainer:
             stoppers = []
         self._stoppers = StopperList(stoppers=stoppers)
 
-    def train(self):
+    def train(self) -> None:
         """
         Train the model.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
         Notes
         -----
-        This method starts the training of the model. The training loop is
-        controlled by the `iterations` attribute. The training is done by
-        repeatedly calling the optimizer's `step` method with the model's
-        closure. The closure is a function that computes the loss, and zeros
-        the gradients of the model's parameters. The loss is then computed,
-        and the gradients are computed using the loss and the model's
-        parameters. The optimizer then uses the gradients to update the
-        model's parameters.
+        This method implements the main training loop:
+        1. Calls `on_train_begin` callback
+        2. For each iteration:
+           - Updates model parameters using optimizer
+           - Updates learning rate if scheduler is provided
+           - Checks stopping criteria
+        3. Calls `on_train_end` callback when training completes
 
-        The training loop is interrupted every `test_every` iterations to
-        test the model. The test step is done by calling the `test_step`
-        method.
-
-        After the training loop has finished, the `on_train_end` callback is
-        called.
+        The training loop continues until either:
+        - The maximum number of iterations is reached
+        - A stopper indicates training should stop
         """
         self._callbacks.on_train_begin()
 
@@ -127,33 +128,25 @@ class Trainer:
 
         self._callbacks.on_train_end()
 
-    def closure(self):
+    def closure(self) -> float:
         """
         The closure function to be passed to the optimizer.
 
-        This function is the one that the optimizer will call to compute the
-        loss. It is called at every iteration of the training loop. The
-        function first calls `on_iteration_begin` on the _callbacks, then
-        zeros the gradients of the model's parameters, computes the loss,
-        and computes the gradients of the loss with respect to the model's
-        parameters. It then calls `on_iteration_end` on the _callbacks, and
-        finally returns the loss.
-
-        Parameters
-        ----------
-        None
-
         Returns
         -------
-        loss : Tensor
-            The computed loss.
+        float
+            The computed loss value.
 
         Notes
         -----
-        This function is used to compute the loss, and to compute the
-        gradients of the loss with respect to the model's parameters. The
-        gradients are then used by the optimizer to update the model's
-        parameters.
+        This function:
+        1. Calls `on_iteration_begin` callback
+        2. Zeros gradients and sets model to training mode
+        3. Computes training loss and its gradients
+        4. Performs test step if needed
+        5. Updates iteration counter and clears gradients
+        6. Calls `on_iteration_end` callback
+        7. Returns the loss value
         """
         self._callbacks.on_iteration_begin()
 
@@ -163,10 +156,9 @@ class Trainer:
             self.trainer_data.model,
             self.trainer_data.iteration,
         )
-        loss.backward()
+        loss.backward()  # type: ignore[no-untyped-call]
 
-        self.trainer_data.losses_train(self.trainer_data.iteration, loss.item())
-
+        self.trainer_data.losses_train[self.trainer_data.iteration] = loss.item()
         if (
             self.trainer_data.iteration % self.trainer_data.test_every == 0
             and self.trainer_data.iteration > 0
@@ -178,15 +170,20 @@ class Trainer:
 
         self._callbacks.on_iteration_end()
 
-        return loss
+        return loss.item()
 
-    def test_step(self):
+    def test_step(self) -> None:
         """
         Perform one testing step.
 
-        This method first sets the model in evaluation mode, then computes
-        the loss on the testing data. The result is saved in the
-        `losses_test` list.
+        Notes
+        -----
+        This method:
+        1. Sets the model to evaluation mode
+        2. Computes the loss on testing data
+        3. Stores the test loss in the losses_test array
+
+        It is called every `test_every` iterations during training.
         """
         self.trainer_data.model.eval()
         loss = self.trainer_data.pde.loss_test(
@@ -194,7 +191,4 @@ class Trainer:
             self.trainer_data.iteration,
         )
 
-        self.trainer_data.losses_test(
-            self.trainer_data.iteration,
-            loss.item(),
-        )
+        self.trainer_data.losses_test[self.trainer_data.iteration] = loss.item()

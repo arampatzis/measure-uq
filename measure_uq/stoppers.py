@@ -25,6 +25,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 if TYPE_CHECKING:
     from measure_uq.trainers.trainer_data import TrainerData
 
@@ -127,7 +129,14 @@ class TrainingLossStopper(Stopper):
         bool
             True if training should be stopped, False otherwise.
         """
-        loss = self.trainer_data.losses_train.values[-1]
+        loss_value = self.trainer_data.losses_train.v[-1]
+
+        if isinstance(loss_value, list | tuple):
+            loss = float(loss_value[0])
+        elif isinstance(loss_value, np.ndarray):
+            loss = float(loss_value.item())
+        else:
+            loss = float(loss_value)
 
         if self.best_loss is None or loss < self.best_loss - self.delta:
             self.best_loss = loss
@@ -136,6 +145,6 @@ class TrainingLossStopper(Stopper):
             self.counter += 1
             if self.counter >= self.patience:
                 print("TrainingLossStopper: early stop triggered")
-                print(self.trainer_data.losses_train.values[-self.patience :])
+                print(self.trainer_data.losses_train.v[-self.patience :])
                 return True
         return False

@@ -54,7 +54,8 @@ repos:
     -   id: mypy
         name: mypy
         entry: mypy
-        args: [--show-error-codes]
+        args: [--show-error-codes, --explicit-package-bases, --config-file=pyproject.toml]
         language: system
         types: [python]
         require_serial: true
+        files: ^(?!sandbox/).+\.py$

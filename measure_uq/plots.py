@@ -20,7 +20,7 @@ from measure_uq.trainers.trainer_data import TrainerData
 def plot_losses(
     trainer_data: TrainerData,
     figsize: tuple = (20, 10),
-):
+) -> tuple[plt.Figure, plt.Axes]:
     """
     Plots the total losses during training and testing and the losses of each
     condition.
@@ -43,20 +43,20 @@ def plot_losses(
 
     ax[0].set_title("Total losses")
     ax[0].plot(
-        trainer_data.losses_train.index,
-        trainer_data.losses_train.values,
+        trainer_data.losses_train.i,
+        trainer_data.losses_train.v,
         label="train",
     )
     ax[0].plot(
-        trainer_data.losses_test.index,
-        trainer_data.losses_test.values,
+        trainer_data.losses_test.i,
+        trainer_data.losses_test.v,
         "--",
         label="test",
     )
 
     ax[1].set_title("Train losses per condition")
     for c in trainer_data.pde.conditions_train:
-        ax[1].plot(c.loss.index, c.loss.values, label=c.__class__.__name__)
+        ax[1].plot(c.loss.i, c.loss.v, label=c.__class__.__name__)
 
     for a in ax:
         a.set_yscale("log")
@@ -89,7 +89,10 @@ class PlotDataOnGrid:
     title: str
 
 
-def plot_1d_on_grid(data: list[PlotDataOnGrid], figsize=(10, 10)):
+def plot_1d_on_grid(
+    data: list[PlotDataOnGrid],
+    figsize: tuple = (10, 10),
+) -> tuple[plt.Figure, plt.Axes]:
     """
     Plots 1D data on a grid of subplots.
 
@@ -150,8 +153,8 @@ def plot_ode_on_grid(
     parameters: Parameters,
     analytical_solution: Callable,
     approximate_solution: Callable,
-    figsize=(10, 10),
-):
+    figsize: tuple = (10, 10),
+) -> tuple[plt.Figure, plt.Axes]:
     """
     Plot the analytical and approximate solution of an ODE on a grid of subplots.
 

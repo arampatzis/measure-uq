@@ -12,16 +12,20 @@ Solution of the ordinary differential equation (ODE):
 import matplotlib.pyplot as plt
 from torch import optim, tensor
 
+from examples.pinn.ex_04.pde import (
+    CallbackLog,
+    Condition1WithResampling,
+    Condition2,
+    RandomParameters,
+)
 from measure_uq.models import PINN
-from measure_uq.pde import PDE
+from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import plot_losses
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
-from .pde import CallbackLog, Condition1WithResampling, Condition2, RandomParameters
 
-
-def main():
+def main() -> None:
     """
     Main function to set up and train the Physics Informed Neural Network (PINN)
     for solving the ODE.
@@ -32,14 +36,12 @@ def main():
     """
     model = PINN([3, 20, 40, 60, 40, 20, 1])
 
-    conditions_train = [
+    conditions = [
         Condition1WithResampling(N=100),
         Condition2(points=tensor([[0.0]])),
     ]
-    conditions_test = [
-        Condition1WithResampling(N=100),
-        Condition2(points=tensor([[0.0]])),
-    ]
+    conditions_train = Conditions(conditions=conditions)
+    conditions_test = Conditions(conditions=conditions)
 
     parameters_train = RandomParameters(N=20)
     parameters_test = RandomParameters(N=100)
@@ -54,8 +56,6 @@ def main():
             100,
         ],
     )
-
-    pde.save("pde-b.pickle")
 
     trainer_data = TrainerData(
         pde=pde,
@@ -74,9 +74,10 @@ def main():
 
     trainer.train()
 
+    pde.save("pde-b.pickle")
     model.save("model-b.pt")
 
-    fig1, ax1 = plot_losses(trainer_data)
+    plot_losses(trainer_data)
 
     plt.show()
 

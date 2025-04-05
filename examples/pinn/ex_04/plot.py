@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
-
 """
-Solution of the ordinary differential equation (ODE):
+Visualizes the exact and approximate solutions of the ordinary differential
+equation (ODE) given by:
 
 .. math::
     y' = p1 * y
     y(0) = p2
+
+The script performs the following steps:
+1. Loads the pre-trained Physics Informed Neural Network (PINN) model and the
+corresponding PDE.
+2. Samples test points and parameters for evaluation.
+3. Computes the exact solution of the ODE using the analytical solution function.
+4. Plots the mean and standard deviation of the exact solution.
+5. Fills the area between the mean ± 1 standard deviation and mean ± 2 standard
+deviations for better visualization.
+
+The results are displayed using matplotlib.
 """
 
 # ruff: noqa: D103
@@ -14,15 +25,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from examples.pinn.ex_04.pde import analytical_solution
 from measure_uq.models import PINN
 from measure_uq.pde import PDE
-
-from .pde import analytical_solution
 
 plt.rc("figure", figsize=[16, 9])
 
 
-def main():
+def main() -> None:
     model = PINN.load("model-b.pt")
     pde = PDE.load("pde-b.pickle")
 
@@ -33,7 +43,7 @@ def main():
 
     y = np.zeros((t.shape[0], p.shape[0]))
     for i in range(p.shape[0]):
-        y[:, i] = analytical_solution(t, p[i, :]).squeeze()
+        y[:, i] = analytical_solution(t, p[i, :]).numpy().squeeze()
 
     fig, ax = plt.subplots(2, 2)
     ax = ax.flatten()

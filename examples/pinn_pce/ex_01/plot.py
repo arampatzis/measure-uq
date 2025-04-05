@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-
 """
-Solution of the ordinary differential equation (ODE):
+Visualizes the solution of an ordinary differential equation (ODE) using a
+Physics Informed Neural Network with Polynomial Chaos Expansion (PINN-PCE).
 
-.. math::
-    y' = p1 * y
-    y(0) = p2
+The script performs the following steps:
+1. Loads the trained PINN-PCE model and the saved PDE.
+2. Samples points and parameters for testing.
+3. Computes the analytical solution of the ODE for the sampled points and parameters.
+4. Plots the mean and standard deviation of the analytical solution.
+5. Uses the trained PINN-PCE model to predict the solution for the sampled points and
+parameters.
+6. Plots the mean and standard deviation of the predicted solution.
+7. Compares the analytical and predicted solutions visually.
+
+The results are displayed using matplotlib.
+
 """
 
 # ruff: noqa: D103 ERA001
@@ -14,15 +23,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch import tensor
 
+from examples.pinn_pce.ex_01.pde import analytical_solution
 from measure_uq.models import PINN_PCE
 from measure_uq.pde import PDE
-
-from pde import analytical_solution
 
 plt.rc("figure", figsize=[16, 9])
 
 
-def main():
+def main() -> None:
+    """
+    Main function to visualize the solution of an ordinary differential equation (ODE)
+    using a Physics Informed Neural Network with Polynomial Chaos Expansion (PINN-PCE).
+    """
     model = PINN_PCE.load("data/model.pt")
     pde = PDE.load("data/pde.pickle")
 
@@ -68,8 +80,8 @@ def main():
     ax[1].fill_between(t.squeeze(), ymean_c - ystd_c, ymean_c + ystd_c, alpha=0.4)
 
     yyy = model.net(tensor(t)).detach().numpy().squeeze()
-    mean = yyy[:, 0]
-    std = np.sqrt(np.sum(yyy**2, axis=1))
+    yyy[:, 0]
+    np.sqrt(np.sum(yyy**2, axis=1))
 
     # ax[2].plot(t, mean, label="1st coefficient")
     ax[2].plot(t, ymean_c, "-", label="Monte Carlo")

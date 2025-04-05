@@ -4,11 +4,17 @@ Utilities for the trainer module.
 This module provides functions for creating optimizers and schedulers for
 training models.
 """
+from typing import Any
+
 import torch
 from torch import nn, optim
 
 
-def get_optimizer(otype: str, model: nn.Module, learning_rate: float):
+def get_optimizer(
+    otype: str,
+    model: nn.Module,
+    learning_rate: float,
+) -> optim.Optimizer:
     """
     Create an optimizer based on the given type and parameters.
 
@@ -40,7 +46,11 @@ def get_optimizer(otype: str, model: nn.Module, learning_rate: float):
             )
 
 
-def get_scheduler(stype: str, optimizer: optim.Optimizer, **kwargs):
+def get_scheduler(
+    stype: str,
+    optimizer: optim.Optimizer,
+    **kwargs: Any,
+) -> optim.lr_scheduler.LRScheduler:
     """
     Create a learning rate scheduler based on the given type and parameters.
 
@@ -55,7 +65,7 @@ def get_scheduler(stype: str, optimizer: optim.Optimizer, **kwargs):
 
     Returns
     -------
-    torch.optim.lr_scheduler._LRScheduler
+    optim.lr_scheduler.LRScheduler
         The created learning rate scheduler.
 
     Notes

@@ -1,4 +1,23 @@
-"""Definition of the ode and its parameters"""
+"""
+Defines the ordinary differential equation (ODE) and its parameters, and provides
+the analytical solution for the ODE. The ODE is given by:
+
+.. math::
+    y' = p1 * y
+    y(0) = p2
+
+The script includes the following components:
+- Analytical solution function to compute the exact solution of the ODE.
+- Condition1 class to represent the residual of the ODE.
+- Necessary imports and dataclass definitions.
+
+The analytical solution function takes time points and parameters as inputs and returns
+the exact solution of the ODE at those points. The Condition1 class evaluates the
+residual of the ODE given the input and output tensors.
+
+This script is intended to be used as part of a Physics Informed Neural Network (PINN)
+framework for solving ODEs.
+"""
 
 from dataclasses import dataclass
 
@@ -11,7 +30,10 @@ from measure_uq.gradients import jacobian
 from measure_uq.pde import Condition, Parameters
 
 
-def analytical_solution(t: float | np.ndarray, p: list | tuple):
+def analytical_solution(
+    t: float | Tensor,
+    p: Tensor,
+) -> Tensor:
     """
     Compute the exact solution for the ODE dy/dt = p1 * y, y(0) = p2.
 
@@ -70,7 +92,7 @@ class Condition1WithResampling(Condition1):
 
     N: int
 
-    def sample_points(self):
+    def sample_points(self) -> None:
         """Sample random points for the ODE residual evaluation."""
         print("Re-sample ODE variables for Condition1")
 
@@ -121,7 +143,7 @@ class RandomParameters(Parameters):
 
     N: int
 
-    def sample_values(self):
+    def sample_values(self) -> None:
         """
         Sample random values for the parameters from a uniform distribution.
 
@@ -152,13 +174,13 @@ class CallbackLog(Callback):
 
     print_every: int = 100
 
-    def on_iteration_end(self):
+    def on_iteration_end(self) -> None:
         """Prints the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
             or self.trainer_data.iteration == self.trainer_data.iterations - 1
         ):
             print(
-                f"{self.trainer_data.losses_train.index[-1]:10}:  "
-                f"{self.trainer_data.losses_train.values[-1]:.5e}",
+                f"{self.trainer_data.losses_train.i[-1]:10}:  "
+                f"{self.trainer_data.losses_train.v[-1]:.5e}",
             )

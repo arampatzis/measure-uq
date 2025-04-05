@@ -7,7 +7,7 @@ import chaospy
 import numpy as np
 
 
-def show_orthogonality_of_expansion():
+def show_orthogonality_of_expansion() -> None:
     a, b = -1.0, 1.0
 
     joint = chaospy.Uniform(a, b)
@@ -44,7 +44,7 @@ def show_orthogonality_of_expansion():
             )
 
 
-def show_expansion():
+def show_expansion() -> None:
     a, b = -1.0, 1.0
 
     joint = chaospy.Uniform(a, b)
@@ -71,7 +71,7 @@ def show_expansion():
     print(y.round(4))
 
 
-def main():
+def main() -> None:
     show_orthogonality_of_expansion()
 
     show_expansion()

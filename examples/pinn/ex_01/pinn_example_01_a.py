@@ -14,17 +14,21 @@ import matplotlib.pyplot as plt
 import torch
 from torch import optim, tensor
 
+from examples.pinn.ex_01.pde import (
+    CallbackLog,
+    Condition1,
+    Condition2,
+    analytical_solution,
+)
 from measure_uq.models import PINN
-from measure_uq.pde import PDE, Parameters
+from measure_uq.pde import PDE, Conditions, Parameters
 from measure_uq.plots import plot_losses, plot_ode_on_grid
 from measure_uq.stoppers import TrainingLossStopper
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
-from .pde import CallbackLog, Condition1, Condition2, analytical_solution
 
-
-def main():
+def main() -> None:
     """
     Main function to set up and train the Physics Informed Neural Network (PINN)
     for solving the ODE.
@@ -35,11 +39,18 @@ def main():
     """
     model = PINN([3, 20, 20, 1])
 
-    conditions_train = [
-        Condition1(points=torch.linspace(0, 2, 101).reshape(-1, 1)),
-        Condition2(points=tensor([[0.0]])),
-    ]
-    conditions_test = deepcopy(conditions_train)
+    conditions_train = Conditions(
+        conditions=[
+            Condition1(points=torch.linspace(0, 2, 101).reshape(-1, 1)),
+            Condition2(points=tensor([[0.0]])),
+        ],
+    )
+    conditions_test = Conditions(
+        conditions=[
+            Condition1(points=torch.linspace(0, 2, 101).reshape(-1, 1)),
+            Condition2(points=tensor([[0.0]])),
+        ],
+    )
 
     parameters_train = Parameters(
         values=torch.cartesian_prod(

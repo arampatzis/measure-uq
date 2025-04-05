@@ -9,11 +9,13 @@ function.
 
 # ruff: noqa: N801
 
+from typing import Self
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 
-from measure_uq.typing import ArrayLike1DInt, PolyExpansion
+from measure_uq.utilities import ArrayLike1DInt, PolyExpansion, torch_numpoly_call
 
 
 def feedforward(n: ArrayLike1DInt) -> nn.Sequential:
@@ -75,9 +77,7 @@ class ModelWithCombinedInput(nn.Module):
     be implemented.
     """
 
-    def __init__(
-        self,
-    ):
+    def __init__(self) -> None:
         super().__init__()
 
     def combine_input(
@@ -121,7 +121,7 @@ class PINN(ModelWithCombinedInput):
 
     Attributes
     ----------
-    hidden : torch.nn.Sequential
+    network : torch.nn.Sequential
         The neural network.
     n : list of int
         List of number of neurons in each layer, including the output layer.
@@ -199,20 +199,20 @@ class PINN(ModelWithCombinedInput):
 
         return z
 
-    def save(self, filepath):
+    def save(self, file_path: str) -> None:
         """Save the model's state and parameters to a file."""
         torch.save(
             {
                 "state_dict": self.state_dict(),
                 "n": self.n,
             },
-            filepath,
+            file_path,
         )
 
     @classmethod
-    def load(cls, filepath):
+    def load(cls, file_path: str) -> Self:
         """Load a model from a file and return an instance."""
-        checkpoint = torch.load(filepath)
+        checkpoint = torch.load(file_path, weights_only=False)
         n = checkpoint["n"]
         model = cls(n=n)
         model.load_state_dict(checkpoint["state_dict"])
@@ -221,60 +221,74 @@ class PINN(ModelWithCombinedInput):
 
 class PINN_PCE(ModelWithCombinedInput):
     """
-    A Physics Informed Neural Network with a Polynomial Chaos Expansion (PINN_PCE)
-    is a neural network that is constrained to satisfy a set of PDEs. The neural
-    network is designed to satisfy the PDEs by minimizing a loss function that
-    measures the difference between the neural network's output and the solution
-    to the PDEs. The output of the neural network is a polynomial chaos expansion.
+    Physics Informed Neural Network with Polynomial Chaos Expansion (PINN_PCE).
 
-    Parameters
-    ----------
-    n : list of int
-        List of number of neurons in each layer, including the output layer.
-    expansion : PolyExpansion
-        The polynomial chaos expansion to use.
+    This class implements a neural network model that combines the principles of
+    Physics Informed Neural Networks (PINNs) with Polynomial Chaos Expansion (PCE).
+    The model is designed to handle inputs and parameters, and it computes the
+    output based on the given polynomial expansion.
 
     Attributes
     ----------
-    n : list of int
-        List of number of neurons in each layer, including the output layer.
-    expansion : PolyExpansion
-        The polynomial chaos expansion to use.
-    net : torch.nn.Sequential
-        The neural network.
-    Nx : int
-        The number of input neurons.
+    coefficients : torch.Tensor
+        The coefficients of the polynomial expansion.
+    exponents : torch.Tensor
+        The exponents of the polynomial expansion.
     np : int
-        The number of output neurons.
+        The number of polynomial terms in the expansion.
+    n : ArrayLike1DInt
+        The architecture of the neural network.
+    Nx : int
+        The number of input features.
+    expansion : PolyExpansion
+        The polynomial expansion used in the model.
+    net : torch.nn.Module
+        The feedforward neural network.
+
+    Methods
+    -------
+    __init__(n: ArrayLike1DInt, expansion: PolyExpansion) -> None
+        Initialize the PINN_PCE model with the given architecture and polynomial
+        expansion.
+    forward(x: Tensor, p: Tensor) -> tuple[Tensor, Tensor]
+        Compute the output of the PCE-PINN for the given input and parameters.
     """
 
-    def __init__(self, n: ArrayLike1DInt, expansion: PolyExpansion) -> None:
-        """
-        Initialize a Physics Informed Neural Network with a Polynomial Chaos Expansion
-        (PINN_PCE).
+    coefficients: torch.Tensor
+    exponents: torch.Tensor
+    np: int
+    n: ArrayLike1DInt
+    Nx: int
+    expansion: PolyExpansion
+    net: torch.nn.Module
 
-        Parameters
-        ----------
-        n : ArrayLike1DInt
-            List of number of neurons in each layer, including the output layer.
-        expansion : PolyExpansion
-            The polynomial chaos expansion to use.
-
-        Returns
-        -------
-        None
-        """
+    def __init__(
+        self,
+        n: ArrayLike1DInt,
+        expansion: PolyExpansion,
+    ) -> None:
         super().__init__()
 
         self.np = len(expansion)
 
-        assert n[-1] == self.np, "The last layer must have dimension 1."
+        assert (
+            n[-1] == self.np
+        ), "Last layer must match the polynomial expansion dimension."
 
         self.n = n
 
-        self.Nx = n[0]
+        self.Nx = int(n[0])
 
         self.expansion = expansion
+
+        self.register_buffer(
+            "exponents",
+            torch.from_numpy(expansion.exponents).long(),
+        )
+        self.register_buffer(
+            "coefficients",
+            torch.tensor(np.array(expansion.coefficients), dtype=torch.float64),
+        )
 
         self.net = feedforward(n)
 
@@ -298,31 +312,16 @@ class PINN_PCE(ModelWithCombinedInput):
         Tensor
             The output of the neural network.
         """
-        phi = torch.tensor(
-            self.expansion(
-                *p.T.detach().numpy(),
-            ).T,
+        # This operation can be executed on GPU.
+        phi = torch_numpoly_call(
+            self.exponents,
+            self.coefficients,
+            p.double(),
         )
 
+        # Same as phi.repeat(n, 1) without copy data. Not gradient broadcasting safe.
         n = x.shape[0]
-
-        # instead of phi.repeat(n, 1)
-        phi = (
-            phi.view(
-                1,
-                phi.shape[0],
-                phi.shape[1],
-            )
-            .expand(
-                n,
-                phi.shape[0],
-                phi.shape[1],
-            )
-            .reshape(
-                n * phi.shape[0],
-                phi.shape[1],
-            )
-        )
+        phi = phi[None, ...].expand(n, -1, -1).reshape(n * phi.shape[0], phi.shape[1])
 
         z = self.combine_input(x, p)
 
@@ -332,7 +331,7 @@ class PINN_PCE(ModelWithCombinedInput):
 
         return z, res
 
-    def save(self, filepath):
+    def save(self, file_path: str) -> None:
         """Save the model's state and parameters to a file."""
         torch.save(
             {
@@ -340,15 +339,16 @@ class PINN_PCE(ModelWithCombinedInput):
                 "n": self.n,
                 "expansion": self.expansion,
             },
-            filepath,
+            file_path,
         )
 
     @classmethod
-    def load(cls, filepath):
+    def load(cls, file_path: str) -> Self:
         """Load a model from a file and return an instance."""
-        checkpoint = torch.load(filepath)
-        n = checkpoint["n"]
-        expansion = checkpoint["expansion"]
-        model = cls(n=n, expansion=expansion)
+        checkpoint = torch.load(file_path, weights_only=False)
+        model = cls(
+            n=checkpoint["n"],
+            expansion=checkpoint["expansion"],
+        )
         model.load_state_dict(checkpoint["state_dict"])
         return model
