@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Visualizes the solution of an ordinary differential equation (ODE) using a
-Physics Informed Neural Network with Polynomial Chaos Expansion (PINN-PCE).
+Visualize the solution of an ODE using a PINN-PCE model.
 
 The script performs the following steps:
 1. Loads the trained PINN-PCE model and the saved PDE.
@@ -32,8 +31,10 @@ plt.rc("figure", figsize=[16, 9])
 
 def main() -> None:
     """
-    Main function to visualize the solution of an ordinary differential equation (ODE)
-    using a Physics Informed Neural Network with Polynomial Chaos Expansion (PINN-PCE).
+    Visualize the solution of an ODE using a PINN-PCE model.
+
+    This function loads the saved model and PDE, and plots the solution alongside
+    the analytical solution for comparison.
     """
     model = PINN_PCE.load("data/model.pt")
     pde = PDE.load("data/pde.pickle")

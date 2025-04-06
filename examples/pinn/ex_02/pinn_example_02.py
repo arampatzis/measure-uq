@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Solves the ordinary differential equation (ODE):
+Solves the ordinary differential equation.
 
 .. math::
     y'' = p_1 y
@@ -34,8 +34,7 @@ from measure_uq.utilities import cartesian_product_of_rows
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
+    Set up and train the Physics Informed Neural Network (PINN).
 
     This function initializes the model, defines the conditions and parameters
     for training and testing, and trains the model using the specified optimizer

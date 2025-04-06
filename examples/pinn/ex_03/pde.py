@@ -1,4 +1,4 @@
-"""Definition of the ode and its parameters"""
+"""Definition of the ode and its parameters."""
 
 from dataclasses import dataclass
 
@@ -19,13 +19,9 @@ def analytical_solution(t: float | np.ndarray, p: list | tuple) -> np.ndarray | 
     t : float or array_like
         Point(s) where the solution is evaluated.
     p : array_like
-        Parameters [p1, p2, p3] where:
-        - p1 : float
-            Coefficient in the ODE.
-        - p2 : float
-            Boundary condition at t = 0 (y(0)).
-        - p3 : float
-            Boundary condition at t = 1 (y(1)).
+        Parameters [p1, p2, p3] where p1 is the coefficient in the ODE, p2 is the
+        boundary condition at t = 0 (y(0)), and p3 is the boundary condition at
+        t = 1 (y(1)).
 
     Returns
     -------
@@ -62,6 +58,8 @@ class Condition1(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
+        Evaluate the residual of the ODE.
+
         Parameters
         ----------
         x : Tensor
@@ -91,6 +89,8 @@ class Condition2(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
+        Evaluate the condition at the given points.
+
         Parameters
         ----------
         x : Tensor
@@ -114,7 +114,7 @@ class Condition3(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
-        Evaluates the condition at the given points.
+        Evaluate the condition at the given points.
 
         Parameters
         ----------

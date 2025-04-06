@@ -1,5 +1,5 @@
 """
-Trainer module
+Trainer module.
 
 This module provides the Trainer class for managing the training process of models
 in the measure-uq package.
@@ -24,8 +24,7 @@ from measure_uq.trainers.trainer_data import TrainerData
 @dataclass(kw_only=True)
 class Trainer:
     """
-    A dataclass to manage the training process, including callbacks and stopping
-    criteria.
+    A dataclass to manage the training process.
 
     This class initializes the training configuration using provided trainer data
     and optional callbacks and stoppers. The internal attributes `_callbacks` and
@@ -69,7 +68,7 @@ class Trainer:
         stoppers: list[Stopper] | None = None,
     ) -> None:
         """
-        Initializes the trainer after construction.
+        Initialize the trainer after construction.
 
         Parameters
         ----------
@@ -104,17 +103,23 @@ class Trainer:
         Notes
         -----
         This method implements the main training loop:
-        1. Calls `on_train_begin` callback
+
+        1. Calls 'on_train_begin' callback.
+
         2. For each iteration:
-           - Updates model parameters using optimizer
-           - Updates learning rate if scheduler is provided
-           - Checks stopping criteria
-        3. Calls `on_train_end` callback when training completes
+
+           - Updates model parameters using optimizer.
+           - Updates learning rate if scheduler is provided.
+           - Checks stopping criteria.
+
+        3. Calls 'on_train_end' callback when training completes.
 
         The training loop continues until either:
-        - The maximum number of iterations is reached
-        - A stopper indicates training should stop
+
+        - The maximum number of iterations is reached.
+        - A stopper indicates training should stop.
         """
+
         self._callbacks.on_train_begin()
 
         while self.trainer_data.iteration < self.trainer_data.iterations:
@@ -130,7 +135,7 @@ class Trainer:
 
     def closure(self) -> float:
         """
-        The closure function to be passed to the optimizer.
+        Closure function to be passed to the optimizer.
 
         Returns
         -------
@@ -139,15 +144,17 @@ class Trainer:
 
         Notes
         -----
-        This function:
-        1. Calls `on_iteration_begin` callback
-        2. Zeros gradients and sets model to training mode
-        3. Computes training loss and its gradients
-        4. Performs test step if needed
-        5. Updates iteration counter and clears gradients
-        6. Calls `on_iteration_end` callback
-        7. Returns the loss value
+        This function performs the following steps:
+        - Calls 'on_iteration_begin' callback.
+        - Zeros gradients and sets model to training mode.
+        - Computes training loss and its gradients.
+        - Performs test step if needed.
+        - Updates iteration counter and clears gradients.
+        - Calls 'on_iteration_end' callback.
+        - Returns the loss value.
         """
+
+
         self._callbacks.on_iteration_begin()
 
         self.trainer_data.optimizer.zero_grad()

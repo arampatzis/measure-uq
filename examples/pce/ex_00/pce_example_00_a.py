@@ -11,6 +11,12 @@ plt.rc("figure", figsize=[16, 10])
 
 
 def main() -> None:
+    """
+    Run the basic polynomial chaos expansion demonstration.
+
+    This function demonstrates the basic usage of polynomial chaos expansion by
+    showing how to generate and evaluate polynomials using chaospy.
+    """
     x = np.linspace(-2.0, 2.0, 100)
     y = np.linspace(-2.0, 2.0, 100)
     grid = np.meshgrid(x, y)

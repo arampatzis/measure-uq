@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
 """
-Visualizes the exact and approximate solutions of the ordinary differential
-equation (ODE) given by:
+Plotting utilities for the PINN example.
 
-.. math::
-    y' = p1 * y
-    y(0) = p2
-
-The script performs the following steps:
-1. Loads the pre-trained Physics Informed Neural Network (PINN) model and the
-corresponding PDE.
-2. Samples test points and parameters for evaluation.
-3. Computes the exact solution of the ODE using the analytical solution function.
-4. Plots the mean and standard deviation of the exact solution.
-5. Fills the area between the mean ± 1 standard deviation and mean ± 2 standard
-deviations for better visualization.
-
-The results are displayed using matplotlib.
+This module provides functions for visualizing the results of the Physics Informed
+Neural Network (PINN) example, including plotting the solution and comparing it
+with the analytical solution.
 """
 
 # ruff: noqa: D103
@@ -33,6 +21,12 @@ plt.rc("figure", figsize=[16, 9])
 
 
 def main() -> None:
+    """
+    Plot the results of the PINN example.
+
+    This function loads the saved model and PDE, and plots the solution along
+    with the analytical solution for comparison.
+    """
     model = PINN.load("model-b.pt")
     pde = PDE.load("pde-b.pickle")
 

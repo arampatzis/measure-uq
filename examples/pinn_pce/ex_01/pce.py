@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Solves the ordinary differential equation (ODE) using a Physics Informed
-Neural Network with Polynomial Chaos Expansion (PINN-PCE):
+Solves an ODE using a PINN-PCE model.
 
 .. math::
     y' = -beta * y
@@ -56,8 +55,7 @@ def collocation_pce(
     samples: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Perform collocation-based Polynomial Chaos Expansion (PCE) to approximate the
-    solution of the ODE.
+    Perform collocation-based PCE to approximate the solution of the ODE.
 
     Parameters
     ----------
@@ -89,7 +87,7 @@ def collocation_pce(
 
 def main() -> None:
     """
-    Main function to set up and solve the ODE using Polynomial Chaos Expansion (PCE).
+    Set up and solve the ODE using Polynomial Chaos Expansion (PCE).
 
     This function defines the probability distributions for the parameters, generates
     polynomial chaos expansion, samples points using Gaussian quadrature, solves the ODE

@@ -1,6 +1,7 @@
 """
-Defines the ordinary differential equation (ODE) and the parameters class for use in a
-Physics Informed Neural Network with Polynomial Chaos Expansion (PINN-PCE):
+Defines the ODE and the parameters for a PINN-PCE model.
+
+The ODE is defined as,
 
 .. math::
     y' = p1 * y
@@ -62,6 +63,7 @@ class Condition1(Condition):
     N: int
 
     def __post_init__(self) -> None:
+        """Initialize the condition after instantiation."""
         assert self.N > 0
         super().__post_init__()
 
@@ -102,19 +104,19 @@ class Condition2(Condition):
 @dataclass(kw_only=True)
 class RandomParameters(Parameters):
     """
-    Class representing random parameters for the ODE.
+    Parameters of the ODE sampled from a joint distribution.
 
     Parameters
     ----------
     joint : chaospy.J
-        Joint probability distribution of the parameters.
+        The joint distribution to sample from.
     N : int
-        Number of samples to generate.
+        Number of parameters to sample.
 
-    Methods
-    -------
-    sample_values()
-        Samples values for the ODE parameters based on the joint distribution.
+    Attributes
+    ----------
+    values : Tensor
+        The sampled values of the parameters.
     """
 
     joint: chaospy.J
@@ -133,7 +135,7 @@ class CallbackLog(Callback):
     print_every: int = 100
 
     def on_iteration_end(self) -> None:
-        """Prints the loss value at each iteration."""
+        """Print the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
             or self.trainer_data.iteration == self.trainer_data.iterations - 1

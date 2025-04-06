@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Solves the ordinary differential equation (ODE) given by:
+Script for training a PINN model.
 
 .. math::
     y' = p2 * y
@@ -34,12 +34,11 @@ from measure_uq.trainers.trainer_data import TrainerData
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
+    Train a PINN model to solve an ODE.
 
-    This function initializes the model, defines the conditions and parameters
-    for training and testing, and trains the model using the specified optimizer
-    and callbacks.
+    This function sets up and trains a PINN model to solve an ordinary
+    differential equation. It demonstrates the basic workflow of training
+    a PINN model with fixed points and parameters.
     """
     model = PINN([3, 20, 20, 20, 20, 1])
 

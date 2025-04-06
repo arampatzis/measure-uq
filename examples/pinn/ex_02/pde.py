@@ -1,4 +1,4 @@
-"""Definition of the ode and its parameters"""
+"""Definition of the ode and its parameters."""
 
 from dataclasses import dataclass
 
@@ -12,6 +12,8 @@ from measure_uq.pde import Condition
 
 def analytical_solution(t: float | np.ndarray, p: list | tuple) -> np.ndarray | None:
     """
+    Return the solution of an ODE.
+
     Compute the exact solution for the ODE y'' = p1 * y with initial conditions:
     y(0) = p2, y'(0) = p3.
 
@@ -20,13 +22,8 @@ def analytical_solution(t: float | np.ndarray, p: list | tuple) -> np.ndarray | 
     t : float or array_like
         Point(s) where the solution is evaluated.
     p : array_like
-        Parameters [p1, p2, p3], where:
-        - p1 : float
-            Coefficient in the ODE.
-        - p2 : float
-            Initial condition y(0).
-        - p3 : float
-            Initial condition y'(0).
+        Parameters [p1, p2, p3], where p1 is the coefficient in the ODE, p2 is the
+        initial condition y(0), and p3 is the initial condition y'(0).
 
     Returns
     -------
@@ -62,6 +59,8 @@ class Condition1(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
+        Evaluate the residual of the ODE.
+
         Parameters
         ----------
         x : Tensor
@@ -91,6 +90,8 @@ class Condition2(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
+        Evaluate the initial condition of the ODE.
+
         Parameters
         ----------
         x : Tensor
@@ -114,6 +115,8 @@ class Condition3(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
+        Evaluate the initial condition of the ODE.
+
         Parameters
         ----------
         x : Tensor

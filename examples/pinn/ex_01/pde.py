@@ -1,4 +1,9 @@
-"""Definition of the ode and its parameters"""
+"""
+Definition of the ODE and its parameters.
+
+This module defines the ordinary differential equation (ODE) and its parameters,
+including the analytical solution and necessary conditions for solving it.
+"""
 
 from dataclasses import dataclass
 
@@ -12,19 +17,14 @@ from measure_uq.pde import Condition
 
 
 def analytical_solution(t: float | np.ndarray, p: list | tuple) -> np.ndarray:
-    """
-    Compute the exact solution for the ODE dy/dt = p1 * y, y(0) = p2.
+    """Compute the exact solution for the ODE dy/dt = p1 * y, y(0) = p2.
 
     Parameters
     ----------
     t : float or array_like
         Point(s) where the solution is evaluated.
     p : array_like
-        Parameters [p1, p2] where:
-        - p1 : float
-            Coefficient in the ODE.
-        - p2 : float
-            Initial condition y(0).
+        Parameters [p1, p2] where p1 is the slope and p2 is the initial condition.
 
     Returns
     -------
@@ -41,6 +41,9 @@ class Condition1(Condition):
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Evaluate the residual.
+
+        This method computes the difference between the derivative of the solution
+        and the right-hand side of the ODE.
 
         Parameters
         ----------
@@ -70,8 +73,9 @@ class Condition2(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
-        Evaluate the initial condition by computing the difference between the
-        derivative and the given value.
+        Evaluate the initial condition.
+
+        Computes the difference between the derivative and the given value.
 
         Parameters
         ----------
@@ -97,7 +101,7 @@ class CallbackLog(Callback):
     print_every: int = 100
 
     def on_iteration_end(self) -> None:
-        """Prints the loss value at each iteration."""
+        """Print the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
             or self.trainer_data.iteration == self.trainer_data.iterations - 1

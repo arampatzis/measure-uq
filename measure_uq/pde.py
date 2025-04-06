@@ -1,5 +1,5 @@
 """
-Partial Differential Equation (PDE) module
+Partial Differential Equation (PDE) module.
 
 This module provides abstract base classes and implementations for defining and working
 with partial differential equations (PDEs) in the measure-uq package.
@@ -52,8 +52,9 @@ from measure_uq.utilities import (
 @dataclass(kw_only=True)
 class Parameters:
     """
-    A class to manage parameter values used in a model, ensuring they are
-    ready for gradient computation.
+    Manage parameter values used in a model.
+
+    Ensuring they are ready for gradient ready for gradient computation.
 
     Attributes
     ----------
@@ -77,8 +78,10 @@ class Parameters:
 
     def __post_init__(self) -> None:
         """
-        Ensures that the `values` attribute is initialized and ready for
-        gradient computation. If not initialized, it attempts to sample values.
+        Initialize the `values` attribute.
+
+        Ensures that the `values` attribute is initialized and ready for gradient
+        computation. If not initialized, it attempts to sample values.
         """
         if self.values.numel() == 0:
             self.sample_values()
@@ -99,8 +102,11 @@ class Parameters:
 
     def sample_values(self) -> None:
         """
-        Placeholder method to sample and assign values to `values`.
-        This method should be implemented in subclasses or instances.
+        Sample and assign values to `values`.
+
+        This method is a placeholder and should be implemented in subclasses or
+        instances. If it is not implemented, the `values` attribute should be set by the
+        user, otherwise an error will be raised.
         """
 
     def to_device(self) -> None:
@@ -139,6 +145,8 @@ class Condition(ABC):
 
     def __post_init__(self) -> None:
         """
+        Initialize the `points` attribute.
+
         Ensures that the `points` attribute is initialized and ready for
         gradient computation. If not initialized, it attempts to sample points.
         """
@@ -160,13 +168,15 @@ class Condition(ABC):
 
     def sample_points(self) -> None:
         """
+        Sample and assign data to the attribute `points`.
+
         Placeholder method to sample and assign data to the attribute `points`.
         This method should be implemented in subclasses or instances.
         """
 
     def __call__(self, model: ModelWithCombinedInput, parameters: Tensor) -> Tensor:
         """
-        Evaluates the condition for given model and parameters.
+        Evaluate the condition for given model and parameters.
 
         Parameters
         ----------
@@ -243,16 +253,13 @@ class Conditions:
     n: int = field(init=False, repr=True)
 
     def __post_init__(self) -> None:
-        """
-        Initializes the number of conditions and moves all points to the specified
-        device.
-        """
+        """Initialize the number of conditions and move all points to the device."""
         self.n = len(self.conditions)
         self.to_device()
 
     def __iter__(self) -> Iterator[Condition]:
         """
-        Returns an iterator over the conditions in the collection.
+        Return an iterator over the conditions in the collection.
 
         Returns
         -------
@@ -263,7 +270,7 @@ class Conditions:
 
     def __getitem__(self, index: int) -> Condition:
         """
-        Returns the condition at the given index.
+        Return the condition at the given index.
 
         Parameters
         ----------
@@ -283,23 +290,23 @@ class Conditions:
         return self.conditions[index]
 
     def __len__(self) -> int:
-        """Returns the number of conditions."""
+        """Return the number of conditions."""
         return len(self.conditions)
 
     def to_device(self) -> None:
         """
-        Moves all points of the conditions to the device specified in the `device`
-        attribute.
+        Move all points of the conditions to a device.
 
-        This method is called during initialization and ensures that all condition
-        points are on the correct device for computation.
+        The device is specified in the `device` attribute. This method is called during
+        initialization and ensures that all condition points are on the correct device
+        for computation.
         """
         for condition in self.conditions:
             condition.points = condition.points.to(self.device)
 
     def sample_points(self, iteration: int, resample_conditions_every: Tensor) -> None:
         """
-        Samples new points for the conditions.
+        Sample new points for the conditions.
 
         Parameters
         ----------
@@ -327,7 +334,7 @@ class Conditions:
         iteration: int,
     ) -> Tensor:
         """
-        Evaluates the conditions.
+        Evaluate the conditions.
 
         Parameters
         ----------
@@ -406,7 +413,7 @@ class PDE:
         resample_conditions_every: ArrayLike1DInt | None = None,
     ) -> None:
         """
-        Validates and initializes attributes after dataclass construction.
+        Validate and initialize attributes after dataclass construction.
 
         Parameters
         ----------
@@ -468,8 +475,9 @@ class PDE:
 
     def loss_train(self, model: ModelWithCombinedInput, iteration: int) -> Tensor:
         """
-        Computes the loss for the training conditions. Re-sample points on conditions
-        or parameters if needed.
+        Compute the loss for the training conditions.
+
+        Re-sample points on conditions or parameters if needed.
 
         Parameters
         ----------
@@ -495,7 +503,7 @@ class PDE:
 
     def loss_test(self, model: ModelWithCombinedInput, iteration: int = 0) -> Tensor:
         """
-        Computes the loss for the testing conditions.
+        Compute the loss for the testing conditions.
 
         Parameters
         ----------
@@ -515,7 +523,7 @@ class PDE:
 
     def save(self, filename: str | Path = "pde.pickle") -> None:
         """
-        Saves the PDE to a file using pickling.
+        Save the PDE to a file using pickling.
 
         Parameters
         ----------
@@ -529,7 +537,7 @@ class PDE:
     @classmethod
     def load(cls, filename: str | Path) -> Self:
         """
-        Loads a PDE instance from a file using pickling.
+        Load a PDE instance from a file using pickling.
 
         Parameters
         ----------

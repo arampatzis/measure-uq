@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Solves the ordinary differential equation (ODE) given by:
+Solves the ordinary differential equation (ODE) given by.
 
 .. math::
     y' = p2 * y
@@ -46,8 +46,7 @@ def make_data() -> None:
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
+    Set up and train the Physics Informed Neural Network (PINN) for solving the ODE.
 
     This function initializes the model, defines the conditions and parameters
     for training and testing, and trains the model using the specified optimizer

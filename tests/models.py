@@ -34,19 +34,17 @@ class MockModule(torch.nn.Module):
         self._mock.return_value = return_value
 
     def forward(self, *args: Any, **kwargs: Any) -> torch.Tensor:
-        """Mocks the forward method."""
+        """Mock the forward method."""
         return self._mock(*args, **kwargs)
 
     def assert_called_with(self, *args: Any, **kwargs: Any) -> None:
-        """Asserts that the forward method was called with the correct arguments."""
+        """Assert that the forward method was called with the correct arguments."""
         self._mock.assert_called_with(*args, **kwargs)
 
 
 def test_pinn_pce() -> None:
     """
-    Test the evaluation of the Physics Informed Neural Network with a Polynomial
-    Chaos Expansion (PINN_PCE).
-
+    Test the evaluation of the PINN_PCE model.
 
     Input/Output of the NN: [-1, 2, -3]
     Expansion:[...]

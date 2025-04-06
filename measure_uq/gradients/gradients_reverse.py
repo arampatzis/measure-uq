@@ -32,7 +32,7 @@ class JacobianReverse(Jacobian):
 
     def __call__(self, i: int | None = None, j: int | None = None) -> torch.Tensor:
         """
-        Returns (`i`, `j`)th entry J[`i`, `j`].
+        Return the Jacobian entry J[i, j].
 
         - If `i` is ``None``, returns the jth column J[:, `j`].
         - If `j` is ``None``, returns the ith row J[`i`, :], i.e., the gradient of y_i.
@@ -90,26 +90,31 @@ def jacobian(
     j: int | None = None,
 ) -> torch.Tensor:
     """
-    Compute the Jacobian matrix of the output tensor with respect to the input tensor.
+    Compute the Jacobian matrix of a tensor with respect to the input tensor.
 
     This function supports lazy evaluation, computing only the necessary parts
     of the Jacobian matrix. It reuses cached results to avoid redundant computations
     for previously computed output-input-(i, j) triplets.
 
-    Args:
-    ----
-        ys: Output Tensor of shape (batch_size, dim_y).
-        xs: Input Tensor of shape (batch_size, dim_x).
-        i (int or None): `i`th row. If `i` is `None`,
-            returns the `j`th column J[:, `j`].
-        j (int or None): `j`th column. If `j` is `None`,
-            returns the `i`th row J[`i`, :]. `i` and `j` cannot be both `None`, unless
-            J has only one element, which is returned.
+    Parameters
+    ----------
+    ys : torch.Tensor
+        Output tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input tensor of shape (batch_size, dim_x).
+    i : int or None, optional
+        Row index. If `i` is None, the function returns the `j`-th column J[:, j].
+    j : int or None, optional
+        Column index. If `j` is None, the function returns the `i`-th row J[i, :].
+        `i` and `j` cannot both be None unless the Jacobian has only one element.
 
-    Returns:
+    Returns
     -------
-        (`i`, `j`)th entry J[`i`, `j`], `i`th row J[`i`, :], or `j`th column J[:, `j`].
+    torch.Tensor
+        The `(i, j)`-th entry J[i, j], the `i`-th row J[i, :], or the `j`-th column J[:, j],
+        depending on the specified arguments.
     """
+
     return _Jacobians(ys, xs, i=i, j=j)
 
 
@@ -143,7 +148,7 @@ class Hessian:
         self.H = JacobianReverse(grad_y, xs)
 
     def __call__(self, i: int = 0, j: int = 0) -> torch.Tensor:
-        """Returns H[`i`, `j`]."""
+        """Return H[`i`, `j`]."""
         return self.H(j, i)
 
 
@@ -168,7 +173,7 @@ class Hessians:
         j: int = 0,
     ) -> torch.Tensor:
         """
-        Compute the Hessian entry
+        Compute the Hessian at [i, j].
 
             H[i, j]=d^2y / dx_i dx_j, where i,j = 0, ..., dim_x - 1,
 
@@ -206,6 +211,7 @@ class Hessians:
         self.Hs = {}
 
 
+# Initialize the Hessians class.
 _Hessians = Hessians()
 
 
@@ -217,25 +223,34 @@ def hessian(
     j: int = 0,
 ) -> torch.Tensor:
     """
-    Compute the Hessian matrix entry H[i, j] = d^2y / dx_i dx_j for the specified
+    Compute the Hessian matrix entry H[i, j].
+
+    Compute the Hessian matrix entry H[i, j] = d²y / dx_i dx_j for the specified
     component of the output tensor, using reverse-mode autodiff.
 
     This function supports lazy evaluation, computing only the necessary parts
     of the Hessian matrix. It reuses cached results to avoid redundant computations
     for previously computed output-input-component triplets.
 
-    Args:
-    ----
-        ys: Output Tensor of shape (batch_size, dim_y).
-        xs: Input Tensor of shape (batch_size, dim_x).
-        component: `ys[:, component]` is used as y to compute the Hessian.
-        i (int): `i`th row index of the Hessian matrix.
-        j (int): `j`th column index of the Hessian matrix.
+    Parameters
+    ----------
+    ys : torch.Tensor
+        Output tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input tensor of shape (batch_size, dim_x).
+    component : int
+        ``ys[:, component]`` is used as y to compute the Hessian.
+    i : int
+        Row index of the Hessian matrix.
+    j : int
+        Column index of the Hessian matrix.
 
-    Returns:
+    Returns
     -------
-        Tensor: The Hessian entry H[i, j] for the specified component.
+    torch.Tensor
+        The Hessian entry H[i, j] for the specified component.
     """
+
     return _Hessians(ys, xs, component=component, i=i, j=j)
 
 

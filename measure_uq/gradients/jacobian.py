@@ -1,4 +1,6 @@
 """
+Provide functions for computing Jacobian matrices.
+
 Compute Jacobian matrix J as J[i, j] = dy_i / dx_j, where i = 0, ..., dim_y - 1
 and j = 0, ..., dim_x - 1.
 
@@ -23,21 +25,33 @@ import torch
 
 class Jacobian(ABC):
     """
+    Abstract base class for computing Jacobian matrices.
+
     Compute `Jacobian matrix <https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant>`_
     J as J[i, j] = dy_i / dx_j, where i = 0, ..., dim_y - 1 and j = 0, ..., dim_x - 1.
 
     It is lazy evaluation, i.e., it only computes J[i, j] when needed.
 
-    Args:
-    ----
-        ys: Output Tensor of shape (batch_size, dim_y).
-        xs: Input Tensor of shape (batch_size, dim_x).
+    Parameters
+    ----------
+        ys: torch.Tensor
+            Output Tensor of shape (batch_size, dim_y).
+        xs: torch.Tensor
+            Input Tensor of shape (batch_size, dim_x).
     """
 
     def __init__(self, ys: torch.Tensor, xs: torch.Tensor) -> None:
-        self.ys = ys
-        self.xs = xs
+        """
+        Initialize the Jacobian.
 
+        Parameters
+        ----------
+        ys : torch.Tensor
+            Output tensor of shape (batch_size, dim_y).
+        xs : torch.Tensor
+            Input tensor of shape (batch_size, dim_x).
+        """
+        self.ys = ys
         self.dim_y = ys.shape[1]
         self.dim_x = xs.shape[1]
 
@@ -46,8 +60,9 @@ class Jacobian(ABC):
     @abstractmethod
     def __call__(self, i: int | None = None, j: int | None = None) -> torch.Tensor:
         """
-        Returns (`i`, `j`)th entry J[`i`, `j`].
+        Return (`i`, `j`)th entry J[`i`, `j`].
 
+        Note that:
         - If `i` is ``None``, returns the jth column J[:, `j`].
         - If `j` is ``None``, returns the ith row J[`i`, :], i.e., the gradient of y_i.
         - `i` and `j` cannot be both ``None``.
@@ -85,6 +100,8 @@ class Jacobians:
         j: int | None = None,
     ) -> torch.Tensor:
         """
+        Compute the Jacobian matrix.
+
         For backend tensorflow and pytorch, self.Js cannot be reused across iteration.
         For backend pytorch, we need to reset self.Js in each iteration to avoid
         memory leak.
@@ -92,7 +109,7 @@ class Jacobians:
         For backend pytorch, in each iteration, ys and xs are new tensors
         converted from np.ndarray, so self.Js will increase over iteration.
 
-        Example:
+        Example
         -------
         mydict = {}
 

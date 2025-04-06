@@ -1,10 +1,9 @@
 """
-Provides classes for creating and managing neural networks.
+Provide classes for creating and managing neural networks.
 
 The module includes classes for managing the networks, such as the `PINN` and `PINN_PCE`
 classes, as well as functions for creating the networks, such as the `feedforward`
 function.
-
 """
 
 # ruff: noqa: N801
@@ -20,7 +19,8 @@ from measure_uq.utilities import ArrayLike1DInt, PolyExpansion, torch_numpoly_ca
 
 def feedforward(n: ArrayLike1DInt) -> nn.Sequential:
     """
-    Creates a feedforward neural network with the given number of neurons in each layer.
+    Create a feedforward NN with the given number of neurons in each layer.
+
     The output of the last layer is the output of the network.
 
     Parameters
@@ -59,22 +59,15 @@ def feedforward(n: ArrayLike1DInt) -> nn.Sequential:
 
 class ModelWithCombinedInput(nn.Module):
     """
-    Abstract base class for neural networks with a combined input of x and p.
+    A model that combines input and parameters.
 
-    The class provides a method `combine_input` to combine the input `x` and the
-    parameters `p` into a single tensor. The method must be implemented by
-    subclasses.
+    This class inherits from `nn.Module` and provides functionality to combine
+    input tensors with parameter tensors. It serves as a base class for more
+    complex models that require combined input and parameters.
 
-    Methods
-    -------
-    combine_input(x, p)
-        Combine input and parameters into a single tensor.
-
-    Notes
-    -----
-    The class is an abstract base class, meaning that it cannot be instantiated
-    directly. Instead, it must be subclassed and the method `combine_input` must
-    be implemented.
+    Attributes
+    ----------
+    None
     """
 
     def __init__(self) -> None:
@@ -109,6 +102,8 @@ class ModelWithCombinedInput(nn.Module):
 
 class PINN(ModelWithCombinedInput):
     """
+    Define a PINN.
+
     A Physics Informed Neural Network (PINN) is a neural network that is
     constrained to satisfy a set of PDEs. The neural network is designed to
     satisfy the PDEs by minimizing a loss function that measures the difference
@@ -176,8 +171,9 @@ class PINN(ModelWithCombinedInput):
         p: Tensor,
     ) -> Tensor:
         """
-        Combine input and parameters into a single tensor. Assert that the dimensions
-        are correct.
+        Combine input and parameters into a single tensor.
+
+        Assert that the dimensions are correct.
 
         Parameters
         ----------
@@ -220,8 +216,7 @@ class PINN(ModelWithCombinedInput):
 
 
 class PINN_PCE(ModelWithCombinedInput):
-    """
-    Physics Informed Neural Network with Polynomial Chaos Expansion (PINN_PCE).
+    """Define a PINN with a PCE.
 
     This class implements a neural network model that combines the principles of
     Physics Informed Neural Networks (PINNs) with Polynomial Chaos Expansion (PCE).
@@ -232,26 +227,25 @@ class PINN_PCE(ModelWithCombinedInput):
     ----------
     coefficients : torch.Tensor
         The coefficients of the polynomial expansion.
+        :no-index:
     exponents : torch.Tensor
         The exponents of the polynomial expansion.
+        :no-index:
     np : int
         The number of polynomial terms in the expansion.
+        :no-index:  
     n : ArrayLike1DInt
         The architecture of the neural network.
+        :no-index:
     Nx : int
         The number of input features.
+        :no-index:
     expansion : PolyExpansion
         The polynomial expansion used in the model.
+        :no-index:
     net : torch.nn.Module
         The feedforward neural network.
-
-    Methods
-    -------
-    __init__(n: ArrayLike1DInt, expansion: PolyExpansion) -> None
-        Initialize the PINN_PCE model with the given architecture and polynomial
-        expansion.
-    forward(x: Tensor, p: Tensor) -> tuple[Tensor, Tensor]
-        Compute the output of the PCE-PINN for the given input and parameters.
+        :no-index:
     """
 
     coefficients: torch.Tensor
@@ -268,7 +262,15 @@ class PINN_PCE(ModelWithCombinedInput):
         expansion: PolyExpansion,
     ) -> None:
         super().__init__()
+        """Initialize the PINN_PCE model.
 
+        Parameters
+        ----------
+        n : ArrayLike1DInt
+            The architecture of the neural network.
+        expansion : PolyExpansion
+            The polynomial expansion used in the model.
+        """
         self.np = len(expansion)
 
         assert (

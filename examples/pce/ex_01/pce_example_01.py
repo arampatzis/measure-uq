@@ -48,19 +48,32 @@ def collocation_pce(
     samples: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Point collocation formulation of PCE. See also:
-    https://github.com/jonathf/chaospy/blob/master/docs/user_guide/main_usage/point_collocation.ipynb
+    Perform collocation-based Polynomial Chaos Expansion (PCE).
+
+    This function approximates the solution of the ODE using collocation-based
+    Polynomial Chaos Expansion.
 
     Parameters
     ----------
-    t : np.ndarray
-        Time points
-    joint : chaospy.Distribution
-        Joint distribution of the parameters
-    expansion : chaospy.poly.Poly
-        PCE expansion
-    samples : np.ndarray
-        Collocation points
+    t
+        Array of time points at which the solution is evaluated.
+
+    joint
+        Joint probability distribution of the parameters.
+
+    expansion
+        Polynomial chaos expansion basis.
+
+    samples
+        Sample points generated using Gaussian quadrature.
+
+    Returns
+    -------
+    mean
+        Mean of the approximate solution.
+
+    std
+        Standard deviation of the approximate solution.
     """
     evals = [model_solver(sample, t) for sample in samples.T]
 
@@ -78,24 +91,29 @@ def galerkin_pce(
     expansion: numpoly.baseclass.ndpoly,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Galerkin formulation of PCE. See also:
-    https://github.com/jonathf/chaospy/blob/master/docs/user_guide/main_usage/intrusive_galerkin.ipynb
+    Perform Galerkin-based Polynomial Chaos Expansion (PCE).
+
+    This function approximates the solution of the ODE using Galerkin-based
+    Polynomial Chaos Expansion.
 
     Parameters
     ----------
-    t : np.ndarray
-        Time array
-    joint : chaospy.Distribution
-        Joint distribution of the random parameters
-    expansion : chaospy.poly.Poly
-        PCE expansion
+    t
+        Array of time points at which the solution is evaluated.
+
+    joint
+        Joint probability distribution of the parameters.
+
+    expansion
+        Polynomial chaos expansion basis.
 
     Returns
     -------
-    mean : np.ndarray
-        Mean of the solution
-    std : np.ndarray
-        Standard deviation of the solution
+    mean
+        Mean of the approximate solution.
+
+    std
+        Standard deviation of the approximate solution.
     """
     alpha, beta = chaospy.variable(2)
 
@@ -108,19 +126,23 @@ def galerkin_pce(
 
     def right_hand_side(c: np.ndarray, _: Any) -> np.ndarray:
         """
-        Right-hand side of the ODE to solve
+        Compute the right-hand side of the ODE.
+
+        This function computes the right-hand side of the ODE for the Galerkin
+        method.
 
         Parameters
         ----------
-        c : np.ndarray
-            Coefficients
-        _ : Any
-            Ignored time argument
+        c
+            Coefficients of the expansion.
+
+        _
+            Ignored time argument.
 
         Returns
         -------
         np.ndarray
-            Right-hand side of the ODE
+            Right-hand side of the ODE.
         """
         return -np.sum(c * e_beta_phi_phi, -1)
 

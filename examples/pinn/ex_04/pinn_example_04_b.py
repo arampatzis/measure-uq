@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-
 """
+Script for training a PINN model with resampling.
+
 Solution of the ordinary differential equation (ODE):
 
 .. math::
@@ -27,12 +28,11 @@ from measure_uq.trainers.trainer_data import TrainerData
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
+    Train a PINN model with resampling.
 
-    This function initializes the model, defines the conditions and parameters
-    for training and testing, and trains the model using the specified optimizer
-    and callbacks.
+    This function sets up and trains a PINN model with resampling of points and
+    parameters during training. It demonstrates how to use the resampling
+    functionality to improve the model's performance.
     """
     model = PINN([3, 20, 40, 60, 40, 20, 1])
 

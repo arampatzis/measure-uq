@@ -13,6 +13,8 @@ from measure_uq.utilities import SparseDynamicArray, torch_numpoly_call
 
 def test_torch_numpoly_call() -> None:
     """
+    Test the function torch_numpoly_call.
+
     Test the function torch_numpoly_call by comparing its output with the same
     computation done with the numpoly library.
     """

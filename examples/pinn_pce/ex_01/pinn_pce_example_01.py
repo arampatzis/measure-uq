@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Solves the ordinary differential equation (ODE) using a Physics Informed Neural Network
-with Polynomial Chaos Expansion (PINN_PCE):
+Solve an ODE using a PINN-PCE model.
+
+The ODE is defined as,
 
 .. math::
     y' = p1 * y
@@ -40,8 +41,7 @@ from measure_uq.trainers.trainer_data import TrainerData
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network with
-    Polynomial Chaos Expansion (PINN_PCE) for solving the ODE.
+    Set up and train a PINN-PCE model to solve an ODE.
 
     This function initializes the model, defines the conditions and parameters
     for training and testing, and trains the model using the specified optimizer

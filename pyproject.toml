@@ -41,7 +41,7 @@ matplotlib = "^3.9.2"
 numpoly = "1.2.14"
 numpy = "^2.2.4"
 pytest = "^8.3.4"
-python = "^3.10"
+python = "^3.11"
 python-box = "^7.2.0"
 sympy = "1.13.1"
 torch = "^2.6.0"
@@ -53,6 +53,13 @@ bpython = "^0.24"
 mypy = "^1.11.2"
 pre-commit = "^4.0.0"
 pretty-errors = "^1.2.25"
+pydocstyle = "^6.3.0"
+ruff = "^0.11.4"
+
+[tool.poetry.group.doc.dependencies]
+numpydoc = "^1.8.0"
+sphinx = "^8.2.3"
+sphinx-rtd-theme = "^3.0.2"
 
 [tool.ruff]
 exclude = ["sandbox"]
@@ -61,16 +68,6 @@ target-version = "py310"
 
 [tool.ruff.lint]
 ignore = [
-  # pydocstyle
-  "D104",
-  "D105",
-  "D107",
-  "D203",
-  "D205",
-  "D212",
-  "D400",
-  "D401",
-  "D415",
   # pylint
   "PLR0913",
   "PLR0915",
@@ -113,3 +110,6 @@ select = ["ALL"]
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"

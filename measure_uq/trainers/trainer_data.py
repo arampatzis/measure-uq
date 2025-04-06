@@ -1,5 +1,5 @@
 """
-Trainer data module
+Trainer data module.
 
 This module provides the data structures for storing and managing training-related data.
 

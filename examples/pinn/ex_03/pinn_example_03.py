@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 r"""
-Solves the second-order ODE:
+Solves the second-order ODE.
 
 .. math::
     y'' = p_1 \\cdot y
@@ -35,8 +35,7 @@ from measure_uq.utilities import cartesian_product_of_rows
 
 def main() -> None:
     """
-    Main function to set up and train the Physics Informed Neural Network (PINN)
-    for solving the ODE.
+    Train the Physics Informed Neural Network (PINN) for solving the ODE.
 
     This function initializes the model, defines the conditions and parameters
     for training and testing, and trains the model using the specified optimizer

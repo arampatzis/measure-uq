@@ -1,22 +1,8 @@
 """
-Defines the ordinary differential equation (ODE) and its parameters, and provides
-the analytical solution for the ODE. The ODE is given by:
+Definition of the ordinary differential equation (ODE) and its parameters.
 
-.. math::
-    y' = p1 * y
-    y(0) = p2
-
-The script includes the following components:
-- Analytical solution function to compute the exact solution of the ODE.
-- Condition1 class to represent the residual of the ODE.
-- Necessary imports and dataclass definitions.
-
-The analytical solution function takes time points and parameters as inputs and returns
-the exact solution of the ODE at those points. The Condition1 class evaluates the
-residual of the ODE given the input and output tensors.
-
-This script is intended to be used as part of a Physics Informed Neural Network (PINN)
-framework for solving ODEs.
+This module defines the ordinary differential equation (ODE) and its parameters,
+including the analytical solution and necessary conditions for solving it.
 """
 
 from dataclasses import dataclass
@@ -42,11 +28,7 @@ def analytical_solution(
     t : float or array_like
         Point(s) where the solution is evaluated.
     p : array_like
-        Parameters [p1, p2] where:
-        - p1 : float
-            Coefficient in the ODE.
-        - p2 : float
-            Initial condition y(0).
+        Parameters [p1, p2] where p1 is the slope and p2 is the initial condition.
 
     Returns
     -------
@@ -63,6 +45,9 @@ class Condition1(Condition):
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
         Evaluate the residual.
+
+        This method computes the difference between the derivative of the solution
+        and the right-hand side of the ODE.
 
         Parameters
         ----------
@@ -105,8 +90,7 @@ class Condition2(Condition):
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
         """
-        Evaluate the initial condition by computing the difference between the
-        derivative and the given value.
+        Evaluate the condition at the given points.
 
         Parameters
         ----------
@@ -118,7 +102,7 @@ class Condition2(Condition):
         Returns
         -------
         Tensor
-            The result of the condition evaluation.
+            The value of the condition at the points.
         """
         assert y.shape == x[:, 1][:, None].shape
 
@@ -145,18 +129,18 @@ class RandomParameters(Parameters):
 
     def sample_values(self) -> None:
         """
-        Sample random values for the parameters from a uniform distribution.
+        Sample random values for the ODE parameters.
 
-        This method assigns sampled values to the `values` attribute, ensuring
-        they are ready for gradient computation.
+        This method generates random values for the parameters of the ODE
+        from a uniform distribution.
 
-        Attributes
+        Parameters
         ----------
-        values : Tensor
-            The sampled values of the parameters, with shape (N, 2). The first
-            column contains values sampled from a uniform distribution in the
-            range [1, 3], and the second column contains values sampled from
-            a uniform distribution in the range [-2, 1].
+        None
+
+        Returns
+        -------
+        None
         """
         print("Re-sample ODE parameters")
         self.values = torch.cat(
@@ -175,7 +159,7 @@ class CallbackLog(Callback):
     print_every: int = 100
 
     def on_iteration_end(self) -> None:
-        """Prints the loss value at each iteration."""
+        """Print the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
             or self.trainer_data.iteration == self.trainer_data.iterations - 1

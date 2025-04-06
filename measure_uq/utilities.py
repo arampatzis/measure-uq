@@ -1,5 +1,5 @@
 """
-Utilities module
+Define type aliases and classes for the measure-uq package.
 
 This module provides utility functions and classes for use in the measure-uq package.
 
@@ -89,8 +89,7 @@ def extend_vector_tensor(
     default_value: float = 0,
 ) -> torch.Tensor:
     """
-    Extend a given tensor to a specified size, filling with a default value
-    if necessary.
+    Extend a tensor to a specified size, filling with a default value if necessary.
 
     Parameters
     ----------
@@ -263,15 +262,18 @@ class DynamicArray:
         self.index_expansion = index_expansion
 
     def __str__(self) -> str:
+        """Return a string representation of the DynamicArray."""
         return self.data.__str__()
 
     def __repr__(self) -> str:
+        """Return a string representation of the DynamicArray."""
         return self.data.__repr__().replace(
             "array",
             f"DynamicArray(size={self.size}, capacity={self.capacity})",
         )
 
     def __getitem__(self, index: index_alias) -> value_alias:
+        """Get item from the DynamicArray."""
         return self.data[index]
 
     def __setitem__(self, index: index_alias, value: value_alias) -> None:
@@ -331,7 +333,7 @@ class DynamicArray:
 
     @staticmethod
     def _get_max_index(index: index_alias) -> int:
-        """Get max index"""
+        """Get the maximum index of the DynamicArray."""
         if isinstance(index, slice):
             return int(index.stop)
         if isinstance(index, tuple):
@@ -341,12 +343,15 @@ class DynamicArray:
         return index + 1
 
     def __getattr__(self, name: str) -> Any:
+        """Get an attribute of the DynamicArray."""
         return getattr(self.data, name)
 
     def __add__(self, a: value_alias) -> value_alias:
+        """Add two DynamicArrays."""
         return self.data + a
 
     def __eq__(self, a: object) -> bool:
+        """Compare two DynamicArrays."""
         if isinstance(a, DynamicArray):
             return bool(np.equal(self.data, a.data).all())
         if isinstance(a, np.ndarray):
@@ -354,27 +359,35 @@ class DynamicArray:
         raise TypeError("Invalid item to compare.")
 
     def __floordiv__(self, a: value_alias) -> value_alias:
+        """Floor divide two DynamicArrays."""
         return self.data // a
 
     def __mod__(self, a: value_alias) -> value_alias:
+        """Modulo two DynamicArrays."""
         return self.data % a
 
     def __mul__(self, a: value_alias) -> value_alias:
+        """Multiply two DynamicArrays."""
         return self.data * a
 
     def __neg__(self) -> value_alias:
+        """Negate a DynamicArray."""
         return -self.data
 
     def __pow__(self, a: value_alias) -> value_alias:
+        """Raise a DynamicArray to a power."""
         return self.data**a
 
     def __truediv__(self, a: value_alias) -> value_alias:
+        """Divide two DynamicArrays."""
         return self.data / a
 
     def __sub__(self, a: value_alias) -> value_alias:
+        """Subtract two DynamicArrays."""
         return self.data - a
 
     def __len__(self) -> int:
+        """Get the length of the DynamicArray."""
         return self.size
 
     def append(self, x: value_alias) -> None:
@@ -387,6 +400,7 @@ class DynamicArray:
         self.capacity -= add_size
 
     def _capacity_check_index(self, index: int = 0) -> None:
+        """Check if the index is within the capacity of the DynamicArray."""
         if index > len(self._data):
             add_size = (index - len(self._data)) + self.capacity
             self._grow_capacity(add_size)
@@ -474,6 +488,7 @@ class DynamicArray:
         )
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the DynamicArray from its pickled state."""
         self._data = state["_data"]
         self.size = state["size"]
         self.capacity = state["capacity"]
@@ -509,6 +524,7 @@ class DynamicArray:
 class SparseDynamicArray:
     """
     A sparse dynamic array implementation that efficiently stores non-zero values.
+
     This class provides a sparse array representation that only stores non-zero values
     and their corresponding indices, allowing for memory-efficient storage of sparse
     data. The array dynamically resizes as elements are added.
@@ -561,8 +577,9 @@ class SparseDynamicArray:
 
     def __getitem__(self, index: int) -> value_alias:
         """
-        Retrieve the value at the specified index. The index should take values from
-        0 to len(self) - 1.
+        Retrieve the value at the specified index.
+
+        The index should take values from 0 to len(self) - 1.
 
         Parameters
         ----------
@@ -595,8 +612,9 @@ class SparseDynamicArray:
 
     def __call__(self, index: int) -> value_alias:
         """
-        Retrieve the value at the specified index. This index correspond to the true
-        sparse index in the array.
+        Retrieve the value at the specified index.
+
+        This index correspond to the true sparse index in the array.
 
         Parameters
         ----------
@@ -626,7 +644,7 @@ class SparseDynamicArray:
 
     def __len__(self) -> int:
         """
-        Returns the length of the array, i.e. the number of elements it contains.
+        Return the length of the array, i.e. the number of elements it contains.
 
         Returns
         -------
@@ -636,6 +654,7 @@ class SparseDynamicArray:
         return self._counter
 
     def __str__(self) -> str:
+        """Return a string representation of the SparseDynamicArray."""
         return (
             f"Indices: {self._indices.__str__()} \n"
             f" Values: {self._values.__str__()} \n "

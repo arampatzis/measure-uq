@@ -1,4 +1,6 @@
 """
+Provide functions for computing gradients, Jacobians and Hessians.
+
 Provides functions for computing gradients, Jacobians and Hessians
 using reverse-mode automatic differentiation.
 
@@ -11,8 +13,5 @@ copied from `deepxde`. Licensed under the GNU Lesser General Public License
 Original source: https://github.com/lululxvi/deepxde
 
 """
-
-
-__all__ = ["clear", "hessian", "jacobian"]
 
 from measure_uq.gradients.gradients import clear, hessian, jacobian

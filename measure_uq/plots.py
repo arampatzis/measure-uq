@@ -22,8 +22,7 @@ def plot_losses(
     figsize: tuple = (20, 10),
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Plots the total losses during training and testing and the losses of each
-    condition.
+    Plot the losses during training and testing and the losses of each condition.
 
     Parameters
     ----------
@@ -94,7 +93,7 @@ def plot_1d_on_grid(
     figsize: tuple = (10, 10),
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Plots 1D data on a grid of subplots.
+    Plot 1D data on a grid of subplots.
 
     Parameters
     ----------

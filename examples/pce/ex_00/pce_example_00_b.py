@@ -8,6 +8,13 @@ import numpy as np
 
 
 def show_orthogonality_of_expansion() -> None:
+    """
+    Demonstrate the orthogonality properties of polynomial chaos expansion.
+
+    This function shows how the polynomials in the expansion are orthogonal with
+    respect to the uniform distribution and how their expectations and variances
+    behave.
+    """
     a, b = -1.0, 1.0
 
     joint = chaospy.Uniform(a, b)
@@ -45,6 +52,13 @@ def show_orthogonality_of_expansion() -> None:
 
 
 def show_expansion() -> None:
+    """
+    Demonstrate polynomial chaos expansion fitting and properties.
+
+    This function shows how to fit a polynomial chaos expansion to trigonometric
+    functions and compare the statistical properties of the expansion with the
+    original data.
+    """
     a, b = -1.0, 1.0
 
     joint = chaospy.Uniform(a, b)
@@ -72,6 +86,12 @@ def show_expansion() -> None:
 
 
 def main() -> None:
+    """
+    Run the demonstration of polynomial chaos expansion properties.
+
+    This function executes both the orthogonality and expansion demonstrations
+    to showcase the capabilities of polynomial chaos expansion.
+    """
     show_orthogonality_of_expansion()
 
     show_expansion()
