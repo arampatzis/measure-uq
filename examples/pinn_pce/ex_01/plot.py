@@ -40,13 +40,21 @@ def main() -> None:
     pde = PDE.load("data/pde.pickle")
 
     # pde.conditions_test[0].sample_ponts()
-    t = np.sort(pde.conditions_test[0].points.detach().numpy(), axis=0)
+    t = np.sort(pde.conditions_test[0].points.cpu().detach().numpy(), axis=0)
     # pde.parameters_test.sample_values()
-    p = pde.parameters_test.values
+    p = pde.parameters_test.values.cpu().detach().numpy()
 
     y = np.zeros((p.shape[0], t.shape[0]))
     for i in range(p.shape[0]):
-        y[i, :] = analytical_solution(tensor(t), p[i, :]).detach().numpy().squeeze()
+        y[i, :] = (
+            analytical_solution(
+                tensor(t),
+                tensor(p[i, :]),
+            )
+            .detach()
+            .numpy()
+            .squeeze()
+        )
 
     fig, ax = plt.subplots(2, 2)
     ax = ax.flatten()
@@ -64,7 +72,7 @@ def main() -> None:
 
     ax[0].plot(t, y.T, alpha=0.25, color="black")
 
-    tp, ym = model(tensor(t), p)
+    tp, ym = model(tensor(t), tensor(p))
     ym = ym.reshape(t.shape[0], p.shape[0]).detach().numpy()
 
     ymean_c = np.mean(ym, axis=1)

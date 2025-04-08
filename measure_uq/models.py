@@ -187,7 +187,11 @@ class PINN(ModelWithCombinedInput):
         torch.Tensor
             Combined input and parameters.
         """
-        assert x.shape[1] + p.shape[1] == self.network[0].in_features
+        if x.shape[1] + p.shape[1] != self.network[0].in_features:
+            raise ValueError(
+                f"Input dimensions do not match. Expected "
+                f"{self.network[0].in_features}, but got {x.shape[1] + p.shape[1]}.",
+            )
 
         z = super().combine_input(x, p)
 
@@ -233,7 +237,7 @@ class PINN_PCE(ModelWithCombinedInput):
         :no-index:
     np : int
         The number of polynomial terms in the expansion.
-        :no-index:  
+        :no-index:
     n : ArrayLike1DInt
         The architecture of the neural network.
         :no-index:

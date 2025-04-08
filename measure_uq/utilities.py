@@ -255,7 +255,7 @@ class DynamicArray:
         shape: int | tuple[int, ...] | list[int] = 100,
         dtype: np.dtype[Any] | type[Any] | None = None,
         index_expansion: bool = False,
-    ):
+    ) -> None:
         self._data = np.zeros(shape, dtype) if dtype is not None else np.zeros(shape)
         self.capacity = self._data.shape[0]
         self.size = 0

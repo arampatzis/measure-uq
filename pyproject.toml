@@ -19,7 +19,7 @@ version = "0.1.0"
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
-exclude = "sandbox(/|\\|$)"
+exclude = "(sandbox|docs)(/|\\|$)"
 python_version = "3.11"
 
 [[tool.mypy.overrides]]
@@ -62,7 +62,7 @@ sphinx = "^8.2.3"
 sphinx-rtd-theme = "^3.0.2"
 
 [tool.ruff]
-exclude = ["sandbox"]
+exclude = ["sandbox", "docs"]
 line-length = 88
 target-version = "py310"
 
@@ -74,16 +74,13 @@ ignore = [
   "PLR2004",
   # ruff
   "RUF001",
-  "RUF015",
   # flake8-bandit
   "S101",
   "S102",
   "S602",
   "S603",
   "S604",
-  # mccabe
-  "C90",
-  # flake8-anootations
+  # flake8-annotations
   "ANN",
   # flake8-commas
   "COM819",

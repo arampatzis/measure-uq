@@ -111,10 +111,9 @@ def jacobian(
     Returns
     -------
     torch.Tensor
-        The `(i, j)`-th entry J[i, j], the `i`-th row J[i, :], or the `j`-th column J[:, j],
-        depending on the specified arguments.
+        The `(i, j)`-th entry J[i, j], the `i`-th row J[i, :], or the `j`-th column
+        J[:, j], depending on the specified arguments.
     """
-
     return _Jacobians(ys, xs, i=i, j=j)
 
 
@@ -250,7 +249,6 @@ def hessian(
     torch.Tensor
         The Hessian entry H[i, j] for the specified component.
     """
-
     return _Hessians(ys, xs, component=component, i=i, j=j)
 
 

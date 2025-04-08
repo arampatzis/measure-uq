@@ -119,7 +119,6 @@ class Trainer:
         - The maximum number of iterations is reached.
         - A stopper indicates training should stop.
         """
-
         self._callbacks.on_train_begin()
 
         while self.trainer_data.iteration < self.trainer_data.iterations:
@@ -153,8 +152,6 @@ class Trainer:
         - Calls 'on_iteration_end' callback.
         - Returns the loss value.
         """
-
-
         self._callbacks.on_iteration_begin()
 
         self.trainer_data.optimizer.zero_grad()

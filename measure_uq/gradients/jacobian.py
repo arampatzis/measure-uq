@@ -88,7 +88,7 @@ class Jacobians:
     rather than creating a new one.
     """
 
-    def __init__(self, jacobian_class: type[Jacobian]):
+    def __init__(self, jacobian_class: type[Jacobian]) -> None:
         self.jacobian_class = jacobian_class
         self.Js: dict = {}
 
