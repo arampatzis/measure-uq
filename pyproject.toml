@@ -40,14 +40,14 @@ clearml = "^1.16.4"
 click = "^8.1.8"
 matplotlib = "^3.9.2"
 numpoly = "1.2.14"
+numpy = {version = "^2.2.4", platform = "linux"}
 pytest = "^8.3.4"
 python = "^3.11"
 python-box = "^7.2.0"
 sympy = "1.13.1"
-wandb = "^0.18.3"
 torch = {version = "^2.6.0", platform = "linux"}
 torchvision = {version = "^0.21.0", platform = "linux"}
-numpy = {version = "^2.2.4", platform = "linux"}
+wandb = "^0.18.3"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"
