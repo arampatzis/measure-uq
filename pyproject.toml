@@ -39,12 +39,18 @@ chaospy = "^4.3.17"
 clearml = "^1.16.4"
 click = "^8.1.8"
 matplotlib = "^3.9.2"
-numpy = {version = "1.26.4", platform = "darwin"}
+numpy = [
+  {version = "1.26.4", platform = "darwin"},
+  {version = "^2.2.4", platform = "linux"}
+]
 pytest = "^8.3.4"
 python = "^3.11"
 python-box = "^7.2.0"
 sympy = "1.13.1"
-torch = {version = "2.2.2", platform = "darwin"}
+torch = [
+  {version = "2.2.2", platform = "darwin"},
+  {version = "^2.6.0", platform = "linux"}
+]
 wandb = "^0.18.3"
 
 [tool.poetry.group.dev.dependencies]
