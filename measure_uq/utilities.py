@@ -46,6 +46,30 @@ ArrayLike1DInt = (
 PolyExpansion = NewType("PolyExpansion", numpoly.baseclass.ndpoly)  # type: ignore [valid-newtype]
 
 
+def to_numpy(x: torch.Tensor | np.ndarray) -> np.ndarray:
+    """Convert an input to a NumPy array.
+
+    This function takes an input, which can be a PyTorch tensor or any array-like
+    object, and converts it to a NumPy array. If the input is a PyTorch tensor, it is
+    first detached from the computation graph and moved to the CPU before being
+    converted to a NumPy array.
+
+    Parameters
+    ----------
+    x : torch.Tensor | np.ndarray
+        The input to be converted to a NumPy array. It can be a PyTorch tensor or
+        a numpy array.
+
+    Returns
+    -------
+    numpy.ndarray
+        The converted NumPy array.
+    """
+    if isinstance(x, torch.Tensor):
+        return x.detach().cpu().numpy()
+    return np.array(x)
+
+
 def cartesian_product_of_rows(*tensors: torch.Tensor) -> torch.Tensor:
     """
     Compute the Cartesian product of the rows of multiple 2D tensors.

@@ -10,95 +10,98 @@ from matplotlib.lines import Line2D
 
 from examples.pinn_pce.ex_02.pde import analytical_solution
 
-joint = J(
-    chaospy.Uniform(1, 3),
-    chaospy.Uniform(1, 3),
-)
 
-order = 5
-expansion = chaospy.generate_expansion(order, joint, normed=True)
+def main() -> None:
+    """Solve the heat equation on the line using the PCE method."""
+    joint = J(
+        chaospy.Uniform(1, 3),
+        chaospy.Uniform(1, 3),
+    )
 
-samples = joint.sample(1000, rule="sobol")
+    order = 5
+    expansion = chaospy.generate_expansion(order, joint, normed=True)
 
-x = np.linspace(0, np.pi, 100)[:, None]
-t = np.linspace(0, 1, 40)[None, :]
+    samples = joint.sample(1000, rule="sobol")
 
-solutions = np.array([analytical_solution(t, x, p) for p in samples.T])
+    x = np.linspace(0, np.pi, 100)[:, None]
+    t = np.linspace(0, 1, 40)[None, :]
 
-pce_coefficients = chaospy.fit_regression(expansion, samples, solutions)
+    solutions = np.array([analytical_solution(t, x, p) for p in samples.T])
 
-mean_solution = chaospy.E(pce_coefficients, joint).T
-std_solution = chaospy.Std(pce_coefficients, joint).T
+    pce_coefficients = chaospy.fit_regression(expansion, samples, solutions)
 
-x = np.squeeze(x)
+    mean_solution = chaospy.E(pce_coefficients, joint).T
+    std_solution = chaospy.Std(pce_coefficients, joint).T
 
-fig, axs = plt.subplots(2, 2, figsize=(16, 10))
-axs = axs.flatten()
+    x = np.squeeze(x)
 
-k = 0
+    fig, axs = plt.subplots(2, 2, figsize=(16, 10))
+    axs = axs.flatten()
 
-ax0_lines = axs[0].plot(x, solutions[:, :, k].T)
+    k = 0
 
-(ax1_mean,) = axs[1].plot(x, mean_solution[k], ".")
+    ax0_lines = axs[0].plot(x, solutions[:, :, k].T)
 
-ax1_fill = axs[1].fill_between(
-    x.T,
-    mean_solution[k] - std_solution[k],
-    mean_solution[k] + std_solution[k],
-    color="blue",
-    alpha=0.3,
-    label="Uncertainty band (1 std)",
-)
+    (ax1_mean,) = axs[1].plot(x, mean_solution[k], ".")
 
-(ax2_line1,) = axs[2].plot(x, np.mean(solutions[:, :, k], axis=0))
-(ax2_line2,) = axs[2].plot(x, mean_solution[k], "--")
-(ax3_line1,) = axs[3].plot(x, np.std(solutions[:, :, k], axis=0))
-(ax3_line2,) = axs[3].plot(x, std_solution[k], "--")
-
-for ax in axs:
-    ax.grid()
-
-
-def animate(i: int) -> tuple[Line2D, Line2D, Line2D, Line2D, Line2D, Line2D, Line2D]:
-    """Animate the solution of the PDE."""
-    for k, line in enumerate(ax0_lines):
-        line.set_ydata(solutions[k, :, i].T)
-
-    ax1_mean.set_ydata(mean_solution[i])
-
-    axs[1].collections[0].remove()
-
-    ax1_fill = axs[1].fill_between(
+    axs[1].fill_between(
         x.T,
-        mean_solution[i] - std_solution[i],
-        mean_solution[i] + std_solution[i],
+        mean_solution[k] - std_solution[k],
+        mean_solution[k] + std_solution[k],
         color="blue",
         alpha=0.3,
         label="Uncertainty band (1 std)",
     )
 
-    ax2_line1.set_ydata(np.mean(solutions[:, :, i], axis=0))
-    ax2_line2.set_ydata(mean_solution[i])
-    ax3_line1.set_ydata(np.std(solutions[:, :, i], axis=0))
-    ax3_line2.set_ydata(std_solution[i])
+    (ax2_line1,) = axs[2].plot(x, np.mean(solutions[:, :, k], axis=0))
+    (ax2_line2,) = axs[2].plot(x, mean_solution[k], "--")
+    (ax3_line1,) = axs[3].plot(x, np.std(solutions[:, :, k], axis=0))
+    (ax3_line2,) = axs[3].plot(x, std_solution[k], "--")
 
-    return (
-        ax0_lines,
-        ax1_mean,
-        ax1_fill,
-        ax2_line1,
-        ax2_line2,
-        ax3_line1,
-        ax3_line2,
+    for ax in axs:
+        ax.grid()
+
+    def animate(
+        i: int,
+    ) -> tuple[Line2D, Line2D, Line2D, Line2D, Line2D, Line2D, Line2D]:
+        """Animate the solution of the PDE."""
+        for k, line in enumerate(ax0_lines):
+            line.set_ydata(solutions[k, :, i].T)
+
+        ax1_mean.set_ydata(mean_solution[i])
+
+        axs[1].collections[0].remove()
+
+        ax1_fill = axs[1].fill_between(
+            x.T,
+            mean_solution[i] - std_solution[i],
+            mean_solution[i] + std_solution[i],
+            color="blue",
+            alpha=0.3,
+            label="Uncertainty band (1 std)",
+        )
+
+        ax2_line1.set_ydata(np.mean(solutions[:, :, i], axis=0))
+        ax2_line2.set_ydata(mean_solution[i])
+        ax3_line1.set_ydata(np.std(solutions[:, :, i], axis=0))
+        ax3_line2.set_ydata(std_solution[i])
+
+        return (
+            ax0_lines,
+            ax1_mean,
+            ax1_fill,
+            ax2_line1,
+            ax2_line2,
+            ax3_line1,
+            ax3_line2,
+        )
+
+    animation.FuncAnimation(
+        fig,
+        animate,
+        interval=200,
+        blit=False,
+        frames=t.shape[1],
     )
 
-
-ani = animation.FuncAnimation(
-    fig,
-    animate,
-    interval=200,
-    blit=False,
-    frames=t.shape[1],
-)
-
-plt.show()
+    plt.show()

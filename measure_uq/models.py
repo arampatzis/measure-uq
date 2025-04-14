@@ -8,6 +8,7 @@ function.
 
 # ruff: noqa: N801
 
+from pathlib import Path
 from typing import Self
 
 import numpy as np
@@ -199,7 +200,7 @@ class PINN(ModelWithCombinedInput):
 
         return z
 
-    def save(self, file_path: str) -> None:
+    def save(self, file_path: str | Path) -> None:
         """Save the model's state and parameters to a file."""
         torch.save(
             {
@@ -210,7 +211,7 @@ class PINN(ModelWithCombinedInput):
         )
 
     @classmethod
-    def load(cls, file_path: str) -> Self:
+    def load(cls, file_path: str | Path) -> Self:
         """Load a model from a file and return an instance."""
         checkpoint = torch.load(file_path, weights_only=False)
         n = checkpoint["n"]
@@ -337,7 +338,7 @@ class PINN_PCE(ModelWithCombinedInput):
 
         return z, res
 
-    def save(self, file_path: str) -> None:
+    def save(self, file_path: str | Path) -> None:
         """Save the model's state and parameters to a file."""
         torch.save(
             {
@@ -349,7 +350,7 @@ class PINN_PCE(ModelWithCombinedInput):
         )
 
     @classmethod
-    def load(cls, file_path: str) -> Self:
+    def load(cls, file_path: str | Path) -> Self:
         """Load a model from a file and return an instance."""
         checkpoint = torch.load(file_path, weights_only=False)
         model = cls(

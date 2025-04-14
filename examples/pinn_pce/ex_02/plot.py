@@ -8,6 +8,8 @@
 
 # ruff: noqa: D103 ERA001
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -16,9 +18,9 @@ from matplotlib.lines import Line2D
 from torch import tensor
 
 from examples.pinn_pce.ex_02.pde import analytical_solution
-from measure_uq.models import PINN_PCE
+from measure_uq.models import PINN, PINN_PCE
 from measure_uq.pde import PDE
-from measure_uq.utilities import cartesian_product_of_rows
+from measure_uq.utilities import cartesian_product_of_rows, to_numpy
 
 plt.rc("figure", figsize=[16, 9])
 
@@ -26,13 +28,17 @@ torch.set_printoptions(
     threshold=200_000,
     precision=4,
     linewidth=120,
-    # sci_mode=False
 )  # type: ignore[no-untyped-call]
 
 
-def main() -> None:
-    model = PINN_PCE.load("data/model.pt")
-    pde = PDE.load("data/pde.pickle")
+def plot(
+    model_path: str | Path,
+    pde_path: str | Path,
+    model_type: type[PINN | PINN_PCE],
+) -> tuple[plt.Figure, plt.Axes, animation.FuncAnimation]:
+    """Plot the solution of the PDE."""
+    model = model_type.load(model_path)
+    pde = PDE.load(pde_path)
 
     t = tensor(np.linspace(0, 1, 40)[:, None])
     x = tensor(np.linspace(0, np.pi, 100)[:, None])
@@ -45,18 +51,19 @@ def main() -> None:
     Nx = x.shape[0]
     Nt = t.shape[0]
     Np = parameters.shape[0]
-    y = torch.tensor([y[k::Np, :].reshape(Nt, Nx).detach().numpy() for k in range(Np)])
-    y = torch.tensor([y[k::Np, :].reshape(Nt, Nx).detach().numpy() for k in range(Np)])
-
-    solutions = np.array(
-        [tensor(analytical_solution(t.T, x, p)).detach().numpy() for p in parameters],
+    yy = np.array(
+        [y[k::Np, :].reshape(Nt, Nx).detach().numpy() for k in range(Np)],
     )
 
-    mean_y = np.mean(y, axis=0)
-    std_y = np.std(y, axis=0)
+    solutions = np.array(
+        [to_numpy(analytical_solution(t.T, x, p)) for p in parameters],
+    )
 
-    mean_solution = np.mean(solutions, axis=0).T
-    std_solution = np.std(solutions, axis=0).T
+    mean_y = yy.mean(axis=0)
+    std_y = yy.std(axis=0)
+
+    mean_solution = solutions.mean(axis=0).T
+    std_solution = solutions.std(axis=0).T
 
     fig, axs = plt.subplots(2, 2, figsize=(16, 10))
     axs = axs.flatten()
@@ -121,7 +128,7 @@ def main() -> None:
             ax3_line2,
         )
 
-    animation.FuncAnimation(
+    anime = animation.FuncAnimation(
         fig,
         animate,
         interval=200,
@@ -129,8 +136,4 @@ def main() -> None:
         frames=t.shape[0],
     )
 
-    plt.show()
-
-
-if __name__ == "__main__":
-    main()
+    return fig, axs, anime

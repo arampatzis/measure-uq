@@ -10,6 +10,7 @@ r"""Solution of the heat equation on the line.
 
 
 import chaospy
+import click
 import matplotlib.pyplot as plt
 from chaospy import J
 from torch import optim
@@ -22,6 +23,7 @@ from examples.pinn_pce.ex_02.pde import (
     RandomParameters,
     Residual,
 )
+from examples.pinn_pce.ex_02.plot import plot
 from measure_uq.models import PINN
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import plot_losses
@@ -29,7 +31,7 @@ from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
 
-def main() -> None:
+def train() -> None:
     """Solve the heat equation on the line using the PINN-PCE method."""
     joint = J(
         chaospy.Uniform(1, 3),
@@ -65,7 +67,7 @@ def main() -> None:
 
     trainer_data = TrainerData(
         pde=pde,
-        iterations=5000,
+        iterations=10000,
         model=model,
         optimizer=optim.LBFGS(model.parameters(), max_iter=5, history_size=5, lr=1),
         test_every=100,
@@ -78,15 +80,34 @@ def main() -> None:
         ],
     )
 
-    pde.save("data/pde.pickle")
-
     trainer.train()
 
-    model.save("data/model.pt")
+    pde.save("data/pde_pinn.pickle")
+    model.save("data/model_pinn.pickle")
+    trainer.save("data/trainer_pinn.pickle")
 
-    fig1, ax1 = plot_losses(trainer_data)
 
+def plot_loss() -> None:
+    """Plot the solution of the PDE."""
+    trainer = Trainer.load("data/trainer_pinn.pickle")
+    fig1, ax1 = plot_losses(trainer.trainer_data)
+
+    fig2, ax2, anime = plot(
+        model_path="data/model_pinn.pickle",
+        pde_path="data/pde_pinn.pickle",
+        model_type=PINN,
+    )
     plt.show()
+
+
+@click.command()
+@click.option("--plot", is_flag=True, help="Run the plot function instead of training.")
+def main(plot: bool) -> None:
+    """Run the training or plotting."""
+    if plot:
+        plot_loss()
+    else:
+        train()
 
 
 if __name__ == "__main__":

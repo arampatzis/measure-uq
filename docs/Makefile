@@ -4,6 +4,7 @@ SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
+FLAGS         = -f -e -P
 
 .PHONY: help html-all Makefile
 
@@ -13,8 +14,10 @@ help:
 
 # Custom target: Generate .rst from code and build HTML docs
 html-all:
-	sphinx-apidoc -f -o $(SOURCEDIR)/measure_uq ../measure_uq/
-	sphinx-apidoc -f -o $(SOURCEDIR)/examples ../examples/
+	sphinx-apidoc $(FLAGS) -o $(SOURCEDIR)/measure_uq ../measure_uq/ \
+		../measure_uq/gradients/gradients.py \
+		../measure_uq/gradients/jacobian.py
+	sphinx-apidoc $(FLAGS) -o $(SOURCEDIR)/examples ../examples/
 	$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:

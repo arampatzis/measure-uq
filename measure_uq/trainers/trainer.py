@@ -13,12 +13,17 @@ Trainer
     A class to manage the training process with callbacks and stopping criteria.
 """
 
+import pickle
 from dataclasses import InitVar, dataclass, field
+from pathlib import Path
+from typing import Self
 
 from measure_uq.callbacks import Callback, CallbackList
 from measure_uq.gradients import clear
 from measure_uq.stoppers import Stopper, StopperList
 from measure_uq.trainers.trainer_data import TrainerData
+
+# ruff: noqa: S301
 
 
 @dataclass(kw_only=True)
@@ -196,3 +201,34 @@ class Trainer:
         )
 
         self.trainer_data.losses_test[self.trainer_data.iteration] = loss.item()
+
+    def save(self, filename: str | Path = "trainer.pickle") -> None:
+        """
+        Save the trainer to a file using pickling.
+
+        Parameters
+        ----------
+        filename : str | Path
+            The name of the file to save the trainer to, by default "trainer.pickle".
+        """
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, filename: str | Path) -> Self:
+        """
+        Load the trainer data from a file.
+
+        Parameters
+        ----------
+        filename : str | Path
+            The name of the file from which the trainer data will be loaded.
+
+        Returns
+        -------
+        Self
+            An instance of the class with the loaded trainer data.
+        """
+        with open(filename, "rb") as f:
+            return pickle.load(f)
