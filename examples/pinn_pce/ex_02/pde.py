@@ -238,7 +238,7 @@ class RandomParameters(Parameters):
 class CallbackLog(Callback):
     """A callback that prints the loss value at each iteration."""
 
-    print_every: int = 100
+    print_every: int = 10
 
     def on_iteration_end(self) -> None:
         """Print the loss value at each iteration."""

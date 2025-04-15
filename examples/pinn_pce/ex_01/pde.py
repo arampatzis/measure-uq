@@ -138,7 +138,7 @@ class CallbackLog(Callback):
         """Print the loss value at each iteration."""
         if (
             self.trainer_data.iteration % self.print_every == 0
-            or self.trainer_data.iteration == self.trainer_data.iterations - 1
+            or self.trainer_data.iteration == self.trainer_data.iterations
         ):
             print(
                 f"{len(self.trainer_data.losses_train):10}:  "

@@ -18,6 +18,8 @@ from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Self
 
+import torch
+
 from measure_uq.callbacks import Callback, CallbackList
 from measure_uq.gradients import clear
 from measure_uq.stoppers import Stopper, StopperList
@@ -103,104 +105,123 @@ class Trainer:
 
     def train(self) -> None:
         """
-        Train the model.
+        Train the model using the provided PDE, optimizer, and callbacks.
+
+        This method performs the training loop, which includes resampling conditions,
+        performing optimization steps, testing on training and test data, and invoking
+        callbacks and stoppers at appropriate stages.
 
         Notes
         -----
-        This method implements the main training loop:
+        - The training loop continues until the specified number of iterations is
+          reached or a stopping criterion is met.
+        - The method invokes callbacks at the beginning and end of training, as well as
+          at the beginning and end of each iteration.
+        - The method also handles resampling conditions and updating the learning rate
+          scheduler if provided.
 
-        1. Calls 'on_train_begin' callback.
-
-        2. For each iteration:
-
-           - Updates model parameters using optimizer.
-           - Updates learning rate if scheduler is provided.
-           - Checks stopping criteria.
-
-        3. Calls 'on_train_end' callback when training completes.
-
-        The training loop continues until either:
-
-        - The maximum number of iterations is reached.
-        - A stopper indicates training should stop.
+        Returns
+        -------
+        None
         """
         self._callbacks.on_train_begin()
 
         while self.trainer_data.iteration < self.trainer_data.iterations:
-            self.trainer_data.optimizer.step(self.closure)
+            self._callbacks.on_iteration_begin()
+
+            self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
+
+            self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
 
             if self.trainer_data.scheduler is not None:
                 self.trainer_data.scheduler.step()
 
+            self.test_on_train()
+
+            self.test_on_test()
+
+            self._callbacks.on_iteration_end()
+
             if self._stoppers.should_stop():
                 break
 
+            self.trainer_data.iteration += 1
+
         self._callbacks.on_train_end()
 
-    def closure(self) -> float:
+    def closure(self) -> torch.Tensor:
         """
-        Closure function to be passed to the optimizer.
+        Compute the loss for the closure function.
+
+        This method is used by optimizers that require a closure function. It clears
+        the cached autograd state, zeroes the gradients, sets the model to training
+        mode, computes the training loss, and performs backpropagation.
 
         Returns
         -------
-        float
-            The computed loss value.
-
-        Notes
-        -----
-        This function performs the following steps:
-        - Calls 'on_iteration_begin' callback.
-        - Zeros gradients and sets model to training mode.
-        - Computes training loss and its gradients.
-        - Performs test step if needed.
-        - Updates iteration counter and clears gradients.
-        - Calls 'on_iteration_end' callback.
-        - Returns the loss value.
+        torch.Tensor
+            The computed training loss.
         """
-        self._callbacks.on_iteration_begin()
+        clear()  # Important: clear cached autograd state (e.g., Jacobians)
 
         self.trainer_data.optimizer.zero_grad()
         self.trainer_data.model.train()
+
+        loss = self.trainer_data.pde.loss_train_for_closure(
+            self.trainer_data.model,
+        )
+        loss.backward()  # type: ignore[no-untyped-call]
+
+        return loss
+
+    def test_on_train(self) -> None:
+        """Evaluate the model on the training dataset and record the loss.
+
+        This method sets the model to evaluation mode, computes the training loss
+        for the current iteration, and stores the loss value in the trainer data.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        self.trainer_data.model.eval()
         loss = self.trainer_data.pde.loss_train(
             self.trainer_data.model,
             self.trainer_data.iteration,
         )
-        loss.backward()  # type: ignore[no-untyped-call]
 
         self.trainer_data.losses_train[self.trainer_data.iteration] = loss.item()
+
+    def test_on_test(self) -> None:
+        """Evaluate the model on the test dataset and record the loss.
+
+        This method sets the model to evaluation mode, computes the test loss
+        for the current iteration if the iteration is a multiple of the test
+        interval, and stores the loss value in the trainer data.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
         if (
             self.trainer_data.iteration % self.trainer_data.test_every == 0
             and self.trainer_data.iteration > 0
         ):
-            self.test_step()
+            self.trainer_data.model.eval()
+            loss = self.trainer_data.pde.loss_test(
+                self.trainer_data.model,
+                self.trainer_data.iteration,
+            )
 
-        self.trainer_data.iteration += 1
-        clear()
-
-        self._callbacks.on_iteration_end()
-
-        return loss.item()
-
-    def test_step(self) -> None:
-        """
-        Perform one testing step.
-
-        Notes
-        -----
-        This method:
-        1. Sets the model to evaluation mode
-        2. Computes the loss on testing data
-        3. Stores the test loss in the losses_test array
-
-        It is called every `test_every` iterations during training.
-        """
-        self.trainer_data.model.eval()
-        loss = self.trainer_data.pde.loss_test(
-            self.trainer_data.model,
-            self.trainer_data.iteration,
-        )
-
-        self.trainer_data.losses_test[self.trainer_data.iteration] = loss.item()
+            self.trainer_data.losses_test[self.trainer_data.iteration] = loss.item()
 
     def save(self, filename: str | Path = "trainer.pickle") -> None:
         """

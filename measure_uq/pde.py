@@ -321,8 +321,11 @@ class Conditions:
         specified iterations. The actual resampling is done by calling the
         `sample_points` method of each condition.
         """
+        if iteration == 0:
+            return
+
         for i, condition in enumerate(self.conditions):
-            if iteration > 0 and iteration % resample_conditions_every[i] == 0:
+            if iteration % resample_conditions_every[i] == 0:
                 condition.sample_points()
                 condition.points.requires_grad = True
                 condition.points = condition.points.to(self.device)
@@ -361,6 +364,36 @@ class Conditions:
         for i, condition in enumerate(self.conditions):
             res[i] = torch.mean(condition(model, parameters) ** 2)
             condition.loss[iteration] = res[i].item()
+
+        return res
+
+    def eval_for_closure(
+        self,
+        model: ModelWithCombinedInput,
+        parameters: Tensor,
+    ) -> Tensor:
+        """
+        Evaluate the conditions for the closure function.
+
+        This method is used by optimizers that require a closure function. It evaluates
+        the conditions using the provided model and parameters, and returns the result
+        as a tensor.
+
+        Parameters
+        ----------
+        model : ModelWithCombinedInput
+            The model to evaluate the conditions for.
+        parameters : Tensor
+            The parameters to use for the evaluation.
+
+        Returns
+        -------
+        Tensor
+            The value of the conditions evaluated for the closure function.
+        """
+        res = torch.zeros(self.n)
+        for i, condition in enumerate(self.conditions):
+            res[i] = torch.mean(condition(model, parameters) ** 2)
 
         return res
 
@@ -473,11 +506,33 @@ class PDE:
             default_value=INT_INF,
         )
 
+    def resample_conditions(self, iteration: int) -> None:
+        """Resample the training conditions based on the current iteration.
+
+        This method checks if the current iteration is a multiple of the resampling
+        interval for each condition. If so, it resamples the points for that condition.
+
+        Parameters
+        ----------
+        iteration : int
+            The current training iteration.
+
+        Returns
+        -------
+        None
+        """
+        self.conditions_train.sample_points(iteration, self.resample_conditions_every_)
+
+        if iteration > 0 and iteration % self.resample_parameters_every == 0:
+            self.parameters_train.sample_values()
+            self.parameters_train.to_device()
+
     def loss_train(self, model: ModelWithCombinedInput, iteration: int) -> Tensor:
         """
-        Compute the loss for the training conditions.
+        Compute the training loss for the given model and iteration.
 
-        Re-sample points on conditions or parameters if needed.
+        This method evaluates the training conditions using the provided model and
+        parameters, and computes the weighted loss based on the specified loss weights.
 
         Parameters
         ----------
@@ -491,31 +546,54 @@ class PDE:
         Tensor
             The computed training loss.
         """
-        self.conditions_train.sample_points(iteration, self.resample_conditions_every_)
-
-        if iteration > 0 and iteration % self.resample_parameters_every == 0:
-            self.parameters_train.sample_values()
-            self.parameters_train.to_device()
-
         res = self.conditions_train.eval(model, self.parameters_train.values, iteration)
+
+        return torch.dot(self.loss_weights_, res)
+
+    def loss_train_for_closure(self, model: ModelWithCombinedInput) -> Tensor:
+        """
+        Compute the training loss for the given model.
+
+        This method evaluates the training conditions using the provided model and
+        parameters, and computes the weighted loss based on the specified loss weights.
+        It is intended to be used as a closure for optimizers that require a closure
+        function.
+
+        Parameters
+        ----------
+        model : ModelWithCombinedInput
+            The model to evaluate the conditions for.
+
+        Returns
+        -------
+        Tensor
+            The computed training loss.
+        """
+        res = self.conditions_train.eval_for_closure(
+            model,
+            self.parameters_train.values,
+        )
 
         return torch.dot(self.loss_weights_, res)
 
     def loss_test(self, model: ModelWithCombinedInput, iteration: int = 0) -> Tensor:
         """
-        Compute the loss for the testing conditions.
+        Compute the test loss for the given model and iteration.
+
+        This method evaluates the test conditions using the provided model and
+        parameters, and computes the weighted loss based on the specified loss weights.
 
         Parameters
         ----------
         model : ModelWithCombinedInput
             The model to evaluate the conditions for.
         iteration : int, optional
-            The current testing iteration (default is 0).
+            The current test iteration, by default 0.
 
         Returns
         -------
         Tensor
-            The computed testing loss.
+            The computed test loss.
         """
         res = self.conditions_test.eval(model, self.parameters_test.values, iteration)
 

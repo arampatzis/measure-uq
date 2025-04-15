@@ -61,22 +61,27 @@ def train() -> None:
         conditions_test=conditions_test,
         parameters_train=parameters_train,
         parameters_test=parameters_test,
-        resample_conditions_every=(100,),
-        resample_parameters_every=500,
+        resample_conditions_every=(50,),
+        resample_parameters_every=100,
     )
 
     trainer_data = TrainerData(
         pde=pde,
-        iterations=10000,
+        iterations=500,
         model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=5, history_size=5, lr=1),
-        test_every=100,
+        optimizer=optim.LBFGS(
+            model.parameters(),
+            max_iter=5,
+            history_size=5,
+            lr=1,
+        ),
+        test_every=20,
     )
 
     trainer = Trainer(
         trainer_data=trainer_data,
         callbacks=[
-            CallbackLog(trainer_data=trainer_data, print_every=100),
+            CallbackLog(trainer_data=trainer_data, print_every=5),
         ],
     )
 
