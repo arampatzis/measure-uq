@@ -4,6 +4,14 @@ Provide classes for creating and managing neural networks.
 The module includes classes for managing the networks, such as the `PINN` and `PINN_PCE`
 classes, as well as functions for creating the networks, such as the `feedforward`
 function.
+
+This module provides:
+    - feedforward: Create a feedforward neural network.
+    - ResidualBlock: Create a residual block.
+    - feedforward_resnet: Create a residual feedforward neural network.
+    - ModelWithCombinedInput: A base class for models that combine input and parameters.
+    - PINN: A Physics Informed Neural Network.
+    - PINN_PCE: A Physics Informed Neural Network with a PCE.
 """
 
 # ruff: noqa: N801
@@ -54,8 +62,132 @@ def feedforward(n: ArrayLike1DInt) -> nn.Sequential:
     for layer in ff:
         if isinstance(layer, nn.Linear):
             nn.init.xavier_uniform_(layer.weight)
+            nn.init.zeros_(layer.bias)
 
     return ff
+
+
+class ResidualBlock(nn.Module):
+    """
+    A residual block for neural networks.
+
+    This block implements a simple residual connection, which helps in training
+    deep networks by allowing gradients to flow through the network more easily.
+
+    Parameters
+    ----------
+    width : int
+        The number of features for the input and output of the block.
+    """
+
+    def __init__(self, width: int) -> None:
+        """
+        Initialize the ResidualBlock.
+
+        Parameters
+        ----------
+        width : int
+            The number of features for the input and output of the block.
+        """
+        super().__init__()
+        self.linear1 = nn.Linear(width, width)
+        self.norm1 = nn.LayerNorm(width)
+        self.activation = nn.Tanh()
+        self.linear2 = nn.Linear(width, width)
+        self.norm2 = nn.LayerNorm(width)
+
+        self.init_weights()
+
+    def init_weights(self) -> None:
+        """
+        Initialize the weights of the linear layers.
+
+        This method sets the weights of the linear layers to a specific
+        initialization strategy, which can help in training the network.
+        """
+        nn.init.xavier_uniform_(self.linear1.weight)
+        nn.init.zeros_(self.linear1.bias)
+
+        nn.init.xavier_uniform_(self.linear2.weight)
+        nn.init.zeros_(self.linear2.bias)
+
+        # Optional: scale the second linear layer to stabilize training
+        with torch.no_grad():
+            self.linear2.weight *= 0.1
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass through the residual block.
+
+        Parameters
+        ----------
+        x : Tensor
+            The input tensor.
+
+        Returns
+        -------
+        Tensor
+            The output tensor after applying the residual connection.
+        """
+        residual = x
+        out = self.linear1(x)
+        out = self.norm1(out)
+        out = self.activation(out)
+        out = self.linear2(out)
+        out = self.norm2(out)
+        return residual + out
+
+
+def feedforward_resnet(n: list[int]) -> nn.Sequential:
+    """
+    Construct a residual feedforward neural network with LayerNorm.
+
+    Parameters
+    ----------
+    n : list of int
+        Architecture definition. Must be of the form
+        [input_dim, width, ..., width, output_dim].
+
+    Returns
+    -------
+    nn.Sequential
+        Residual network model.
+    """
+    if len(n) < 3:
+        raise ValueError("Must have at least 3 layers: input, one hidden, output.")
+
+    input_dim = n[0]
+    output_dim = n[-1]
+    hidden_layers = n[1:-1]
+
+    # Ensure all hidden layers have the same width
+    if any(width != hidden_layers[0] for width in hidden_layers):
+        raise ValueError(
+            "All hidden layers in a residual network must have the same width.",
+        )
+
+    width = hidden_layers[0]
+    depth = len(hidden_layers)
+
+    first_layer = nn.Linear(input_dim, width)
+    nn.init.xavier_uniform_(first_layer.weight)
+    nn.init.zeros_(first_layer.bias)
+
+    layers = [
+        first_layer,
+        nn.LayerNorm(width),
+        nn.Tanh(),
+    ]
+
+    for _ in range(depth - 1):
+        layers.append(ResidualBlock(width))  # noqa: PERF401
+
+    output_layer = nn.Linear(width, output_dim)
+    nn.init.xavier_uniform_(output_layer.weight)
+    nn.init.zeros_(output_layer.bias)
+    layers.append(output_layer)
+
+    return nn.Sequential(*layers)
 
 
 class ModelWithCombinedInput(nn.Module):
@@ -72,6 +204,12 @@ class ModelWithCombinedInput(nn.Module):
     """
 
     def __init__(self) -> None:
+        """
+        Initialize the ModelWithCombinedInput.
+
+        This constructor sets up the base structure for models that combine
+        input and parameters.
+        """
         super().__init__()
 
     def combine_input(
@@ -135,6 +273,7 @@ class PINN(ModelWithCombinedInput):
         Returns
         -------
         None
+            This method does not return anything.
         """
         super().__init__()
 
@@ -201,7 +340,14 @@ class PINN(ModelWithCombinedInput):
         return z
 
     def save(self, file_path: str | Path) -> None:
-        """Save the model's state and parameters to a file."""
+        """
+        Save the model's state and parameters to a file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file where the model will be saved.
+        """
         torch.save(
             {
                 "state_dict": self.state_dict(),
@@ -212,7 +358,19 @@ class PINN(ModelWithCombinedInput):
 
     @classmethod
     def load(cls, file_path: str | Path) -> Self:
-        """Load a model from a file and return an instance."""
+        """
+        Load a model from a file and return an instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file from which to load the model.
+
+        Returns
+        -------
+        PINN
+            The loaded model instance.
+        """
         checkpoint = torch.load(file_path, weights_only=False)
         n = checkpoint["n"]
         model = cls(n=n)
@@ -221,12 +379,20 @@ class PINN(ModelWithCombinedInput):
 
 
 class PINN_PCE(ModelWithCombinedInput):
-    """Define a PINN with a PCE.
+    """
+    Define a PINN with a PCE.
 
     This class implements a neural network model that combines the principles of
     Physics Informed Neural Networks (PINNs) with Polynomial Chaos Expansion (PCE).
     The model is designed to handle inputs and parameters, and it computes the
     output based on the given polynomial expansion.
+
+    Parameters
+    ----------
+    n : ArrayLike1DInt
+        The architecture of the neural network.
+    expansion : PolyExpansion
+        The polynomial expansion used in the model.
 
     Attributes
     ----------
@@ -266,8 +432,8 @@ class PINN_PCE(ModelWithCombinedInput):
         n: ArrayLike1DInt,
         expansion: PolyExpansion,
     ) -> None:
-        super().__init__()
-        """Initialize the PINN_PCE model.
+        """
+        Initialize the PINN_PCE model.
 
         Parameters
         ----------
@@ -276,6 +442,8 @@ class PINN_PCE(ModelWithCombinedInput):
         expansion : PolyExpansion
             The polynomial expansion used in the model.
         """
+        super().__init__()
+
         self.np = len(expansion)
 
         assert (
@@ -339,7 +507,14 @@ class PINN_PCE(ModelWithCombinedInput):
         return z, res
 
     def save(self, file_path: str | Path) -> None:
-        """Save the model's state and parameters to a file."""
+        """
+        Save the model's state and parameters to a file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file where the model will be saved.
+        """
         torch.save(
             {
                 "state_dict": self.state_dict(),
@@ -351,7 +526,19 @@ class PINN_PCE(ModelWithCombinedInput):
 
     @classmethod
     def load(cls, file_path: str | Path) -> Self:
-        """Load a model from a file and return an instance."""
+        """
+        Load a model from a file and return an instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file from which to load the model.
+
+        Returns
+        -------
+        PINN_PCE
+            The loaded model instance.
+        """
         checkpoint = torch.load(file_path, weights_only=False)
         model = cls(
             n=checkpoint["n"],

@@ -21,7 +21,46 @@ from .jacobian import Jacobian, Jacobians
 
 
 class JacobianReverse(Jacobian):
+    """
+    Compute the Jacobian matrix of a tensor with respect to the input tensor.
+
+    This class is a wrapper of the `jacobian` function, but it is specialized to
+    compute the Jacobian matrix of a given component of the output tensor with
+    respect to the input tensor. The Jacobian matrix is computed using reverse-mode
+    autodiff.
+
+    Parameters
+    ----------
+    ys : torch.Tensor
+        Output tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input tensor of shape (batch_size, dim_x).
+
+    Attributes
+    ----------
+    xs : torch.Tensor
+        Input tensor of shape (batch_size, dim_x).
+    ys : torch.Tensor
+        Output tensor of shape (batch_size, dim_y).
+    dim_y : int
+        The dimension of the output tensor.
+    dim_x : int
+        The dimension of the input tensor.
+    J : dict
+        A dictionary of cached Jacobian matrices.
+    """
+
     def __init__(self, ys: torch.Tensor, xs: torch.Tensor) -> None:
+        """
+        Initialize the JacobianReverse.
+
+        Parameters
+        ----------
+        ys : torch.Tensor
+            Output tensor of shape (batch_size, dim_y).
+        xs : torch.Tensor
+            Input tensor of shape (batch_size, dim_x).
+        """
         self.ys = ys
         self.xs = xs
 
@@ -37,6 +76,18 @@ class JacobianReverse(Jacobian):
         - If `i` is ``None``, returns the jth column J[:, `j`].
         - If `j` is ``None``, returns the ith row J[`i`, :], i.e., the gradient of y_i.
         - `i` and `j` cannot be both ``None``.
+
+        Parameters
+        ----------
+        i : int | None
+            The index of the row to return.
+        j : int | None
+            The index of the column to return.
+
+        Returns
+        -------
+        torch.Tensor
+            The Jacobian entry J[i, j].
         """
         if i is None and j is None:
             if self.dim_x > 1 or self.dim_y > 1:
@@ -129,9 +180,35 @@ class Hessian:
     The Hessian matrix is computed lazily, i.e., it only computes the necessary
     parts of the Hessian matrix when needed. For previously computed output-input
     pairs, it reuses cached results to avoid duplicate computations.
+
+    Parameters
+    ----------
+    ys : torch.Tensor
+        Output tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input tensor of shape (batch_size, dim_x).
+    component : int
+        The component of `ys` to use for computing the Hessian.
+
+    Attributes
+    ----------
+    H : torch.Tensor
+        The Hessian matrix.
     """
 
     def __init__(self, ys: torch.Tensor, xs: torch.Tensor, component: int = 0) -> None:
+        """
+        Initialize the Hessian.
+
+        Parameters
+        ----------
+        ys : torch.Tensor
+            Output tensor of shape (batch_size, dim_y).
+        xs : torch.Tensor
+            Input tensor of shape (batch_size, dim_x).
+        component : int
+            The line of `ys` to use for computing the Hessian.
+        """
         dim_y = ys.shape[1]
 
         if component >= dim_y:
@@ -147,7 +224,21 @@ class Hessian:
         self.H = JacobianReverse(grad_y, xs)
 
     def __call__(self, i: int = 0, j: int = 0) -> torch.Tensor:
-        """Return H[`i`, `j`]."""
+        """
+        Return the Hessian entry H[i, j].
+
+        Parameters
+        ----------
+        i : int
+            The row index of the Hessian entry.
+        j : int
+            The column index of the Hessian entry.
+
+        Returns
+        -------
+        torch.Tensor
+            The Hessian entry H[i, j].
+        """
         return self.H(j, i)
 
 
@@ -158,9 +249,15 @@ class Hessians:
     A new instance will be created for a new pair of (output, input). For the (output,
     input) pair that has been computed before, it will reuse the previous instance,
     rather than creating a new one.
+
+    Attributes
+    ----------
+    Hs : dict
+        A dictionary of cached Hessian instances.
     """
 
     def __init__(self) -> None:
+        """Initialize the Hessians."""
         self.Hs: dict[tuple[torch.Tensor, torch.Tensor, int], Hessian] = {}
 
     def __call__(

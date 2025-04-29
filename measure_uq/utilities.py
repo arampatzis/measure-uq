@@ -3,32 +3,34 @@ Define type aliases and classes for the measure-uq package.
 
 This module provides utility functions and classes for use in the measure-uq package.
 
-The module includes:
-- Type aliases for array-like objects
-- Functions for tensor operations like cartesian_product_of_rows
-- DynamicArray class for efficient resizable arrays
-- SparseDynamicArray class for memory-efficient sparse data storage
-- Utility functions for working with polynomial expansions
-
-Classes
--------
-DynamicArray
-    A dynamic array implementation that automatically resizes as elements are added.
-SparseDynamicArray
-    A sparse dynamic array implementation that efficiently stores non-zero values.
-
-Functions
----------
-cartesian_product_of_rows
-    Compute the Cartesian product of the rows of multiple 2D tensors.
-torch_numpoly_call
-    Evaluate a polynomial expansion using PyTorch tensors.
+This module provides:
+    - Type aliases for array-like objects (ArrayLike1DFloat, ArrayLike1DInt)
+    - Type alias for polynomial expansions (PolyExpansion)
+    - DynamicArray class for resizable arrays
+    - SparseDynamicArray class for efficient sparse array storage
+    - Buffer class for managing collections of tensors
+    - KeyControl class for keyboard control of program execution
+    - Utility functions:
+        - to_numpy: Convert tensors to numpy arrays
+        - cartesian_product_of_rows: Compute the Cartesian product of the rows of
+        multiple 2D tensors
+        - extend_vector_tensor: Extend a tensor to a specified size
+        - torch_numpoly_call: Evaluate a polynomial expansion using PyTorch tensors
 """
 
+import atexit
+import contextlib
+import signal
+import sys
+import termios
+import threading
+import tty
 from collections.abc import Sequence
 from copy import deepcopy
+from types import FrameType
 from typing import Any, NewType
 
+import matplotlib.pyplot as plt
 import numpoly
 import numpy as np
 import numpy.typing as npt
@@ -45,9 +47,18 @@ ArrayLike1DInt = (
 
 PolyExpansion = NewType("PolyExpansion", numpoly.baseclass.ndpoly)  # type: ignore [valid-newtype]
 
+number_type = (int, float)
+array_type = (np.ndarray, list, tuple)
+value_type = array_type + number_type
+value_alias = int | float | list[Any] | tuple[Any] | np.ndarray
+index_alias = int | slice | tuple[int]
+
+numpy_array_like = np.ndarray | Sequence | float | int
+
 
 def to_numpy(x: torch.Tensor | np.ndarray) -> np.ndarray:
-    """Convert an input to a NumPy array.
+    """
+    Convert an input to a NumPy array.
 
     This function takes an input, which can be a PyTorch tensor or any array-like
     object, and converts it to a NumPy array. If the input is a PyTorch tensor, it is
@@ -219,13 +230,6 @@ def torch_numpoly_call(
     return monomials @ coefficients  # (N, K)
 
 
-number_type = (int, float)
-array_type = (np.ndarray, list, tuple)
-value_type = array_type + number_type
-value_alias = int | float | list[Any] | tuple[Any] | np.ndarray
-index_alias = int | slice | tuple[int]
-
-
 # This class is adapted from numpy_dynamic_array by Dylan Walsh
 # Licensed under the BSD 3-Clause License. See NOTICE.txt for details.
 class DynamicArray:
@@ -280,24 +284,69 @@ class DynamicArray:
         dtype: np.dtype[Any] | type[Any] | None = None,
         index_expansion: bool = False,
     ) -> None:
+        """
+        Initialize a DynamicArray instance.
+
+        Parameters
+        ----------
+        shape : int or tuple or list, optional
+            The initial shape of the array. Default is 100.
+        dtype : data-type, optional
+            The data type of the array. Default is None, which corresponds to numpy's
+            default data type.
+        index_expansion : bool, optional
+            If True, the array will automatically grow to accommodate indices beyond
+            the current size. Default is False.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
         self._data = np.zeros(shape, dtype) if dtype is not None else np.zeros(shape)
         self.capacity = self._data.shape[0]
         self.size = 0
         self.index_expansion = index_expansion
 
     def __str__(self) -> str:
-        """Return a string representation of the DynamicArray."""
+        """
+        Return a string representation of the DynamicArray.
+
+        Returns
+        -------
+        str
+            A string representation of the DynamicArray.
+        """
         return self.data.__str__()
 
     def __repr__(self) -> str:
-        """Return a string representation of the DynamicArray."""
+        """
+        Return a string representation of the DynamicArray.
+
+        Returns
+        -------
+        str
+            A string representation of the DynamicArray.
+        """
         return self.data.__repr__().replace(
             "array",
             f"DynamicArray(size={self.size}, capacity={self.capacity})",
         )
 
     def __getitem__(self, index: index_alias) -> value_alias:
-        """Get item from the DynamicArray."""
+        """
+        Get item from the DynamicArray.
+
+        Parameters
+        ----------
+        index : int, slice, or tuple
+            Index or indices to retrieve from the array.
+
+        Returns
+        -------
+        value_alias
+            The value at the specified index.
+        """
         return self.data[index]
 
     def __setitem__(self, index: index_alias, value: value_alias) -> None:
@@ -357,7 +406,19 @@ class DynamicArray:
 
     @staticmethod
     def _get_max_index(index: index_alias) -> int:
-        """Get the maximum index of the DynamicArray."""
+        """
+        Get the maximum index of the DynamicArray.
+
+        Parameters
+        ----------
+        index : int, slice, or tuple
+            Index or indices to evaluate.
+
+        Returns
+        -------
+        int
+            The maximum index value.
+        """
         if isinstance(index, slice):
             return int(index.stop)
         if isinstance(index, tuple):
@@ -367,15 +428,51 @@ class DynamicArray:
         return index + 1
 
     def __getattr__(self, name: str) -> Any:
-        """Get an attribute of the DynamicArray."""
+        """
+        Get an attribute of the DynamicArray.
+
+        Parameters
+        ----------
+        name : str
+            The name of the attribute to retrieve.
+
+        Returns
+        -------
+        Any
+            The attribute value.
+        """
         return getattr(self.data, name)
 
     def __add__(self, a: value_alias) -> value_alias:
-        """Add two DynamicArrays."""
+        """
+        Add two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to add to the DynamicArray.
+
+        Returns
+        -------
+        value_alias
+            The result of the addition.
+        """
         return self.data + a
 
     def __eq__(self, a: object) -> bool:
-        """Compare two DynamicArrays."""
+        """
+        Compare two DynamicArrays.
+
+        Parameters
+        ----------
+        a : object
+            The object to compare with the DynamicArray.
+
+        Returns
+        -------
+        bool
+            True if the objects are equal, False otherwise.
+        """
         if isinstance(a, DynamicArray):
             return bool(np.equal(self.data, a.data).all())
         if isinstance(a, np.ndarray):
@@ -383,39 +480,137 @@ class DynamicArray:
         raise TypeError("Invalid item to compare.")
 
     def __floordiv__(self, a: value_alias) -> value_alias:
-        """Floor divide two DynamicArrays."""
+        """
+        Floor divide two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to floor divide the DynamicArray by.
+
+        Returns
+        -------
+        value_alias
+            The result of the floor division.
+        """
         return self.data // a
 
     def __mod__(self, a: value_alias) -> value_alias:
-        """Modulo two DynamicArrays."""
+        """
+        Modulo two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to modulo the DynamicArray by.
+
+        Returns
+        -------
+        value_alias
+            The result of the modulo operation.
+        """
         return self.data % a
 
     def __mul__(self, a: value_alias) -> value_alias:
-        """Multiply two DynamicArrays."""
+        """
+        Multiply two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to multiply the DynamicArray by.
+
+        Returns
+        -------
+        value_alias
+            The result of the multiplication.
+        """
         return self.data * a
 
     def __neg__(self) -> value_alias:
-        """Negate a DynamicArray."""
+        """
+        Negate a DynamicArray.
+
+        Returns
+        -------
+        value_alias
+            The negated DynamicArray.
+        """
         return -self.data
 
     def __pow__(self, a: value_alias) -> value_alias:
-        """Raise a DynamicArray to a power."""
+        """
+        Raise a DynamicArray to a power.
+
+        Parameters
+        ----------
+        a : value_alias
+            The exponent to raise the DynamicArray to.
+
+        Returns
+        -------
+        value_alias
+            The result of the power operation.
+        """
         return self.data**a
 
     def __truediv__(self, a: value_alias) -> value_alias:
-        """Divide two DynamicArrays."""
+        """
+        Divide two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to divide the DynamicArray by.
+
+        Returns
+        -------
+        value_alias
+            The result of the division.
+        """
         return self.data / a
 
     def __sub__(self, a: value_alias) -> value_alias:
-        """Subtract two DynamicArrays."""
+        """
+        Subtract two DynamicArrays.
+
+        Parameters
+        ----------
+        a : value_alias
+            The value to subtract from the DynamicArray.
+
+        Returns
+        -------
+        value_alias
+            The result of the subtraction.
+        """
         return self.data - a
 
     def __len__(self) -> int:
-        """Get the length of the DynamicArray."""
+        """
+        Get the length of the DynamicArray.
+
+        Returns
+        -------
+        int
+            The number of elements in the DynamicArray.
+        """
         return self.size
 
     def append(self, x: value_alias) -> None:
-        """Add data to array."""
+        """
+        Add data to the DynamicArray.
+
+        Parameters
+        ----------
+        x : value_alias
+            The data to append to the DynamicArray.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
         add_size = self._capacity_check(x)
 
         # Add new data to array
@@ -424,13 +619,37 @@ class DynamicArray:
         self.capacity -= add_size
 
     def _capacity_check_index(self, index: int = 0) -> None:
-        """Check if the index is within the capacity of the DynamicArray."""
+        """
+        Check if the index is within the capacity of the DynamicArray.
+
+        Parameters
+        ----------
+        index : int, optional
+            The index to check. Default is 0.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
         if index > len(self._data):
             add_size = (index - len(self._data)) + self.capacity
             self._grow_capacity(add_size)
 
     def _capacity_check(self, x: value_alias) -> int:
-        """Check if there is room for the new data."""
+        """
+        Check if there is room for the new data.
+
+        Parameters
+        ----------
+        x : value_alias
+            The data to check capacity for.
+
+        Returns
+        -------
+        int
+            The size of the data to be added.
+        """
         if isinstance(x, number_type):
             add_size = 1
         elif isinstance(x, array_type):
@@ -481,7 +700,14 @@ class DynamicArray:
 
     @property
     def data(self) -> np.ndarray:
-        """Returns data without extra spaces."""
+        """
+        Return data without extra spaces.
+
+        Returns
+        -------
+        np.ndarray
+            The data of the DynamicArray without extra spaces.
+        """
         return self._data[: self.size]
 
     def __reduce__(
@@ -512,7 +738,19 @@ class DynamicArray:
         )
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Restore the DynamicArray from its pickled state."""
+        """
+        Restore the DynamicArray from its pickled state.
+
+        Parameters
+        ----------
+        state : dict[str, Any]
+            The state dictionary to restore the DynamicArray from.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
         self._data = state["_data"]
         self.size = state["size"]
         self.capacity = state["capacity"]
@@ -678,7 +916,14 @@ class SparseDynamicArray:
         return self._counter
 
     def __str__(self) -> str:
-        """Return a string representation of the SparseDynamicArray."""
+        """
+        Return a string representation of the SparseDynamicArray.
+
+        Returns
+        -------
+        str
+            A string representation of the SparseDynamicArray.
+        """
         return (
             f"Indices: {self._indices.__str__()} \n"
             f" Values: {self._values.__str__()} \n "
@@ -773,3 +1018,352 @@ class SparseDynamicArray:
         self._values = state["_values"]
         self._indices = state["_indices"]
         self._counter = state["_counter"]
+
+
+class Buffer:
+    """
+    A class to manage a collection of tensors.
+
+    This class provides methods to register tensors, move them to a specified device,
+    and save/load their state.
+
+    Attributes
+    ----------
+    _buffers : dict
+        A dictionary to store the registered tensors.
+
+    Methods
+    -------
+    register(name, tensor)
+        Register a tensor with a given name.
+    to(device)
+        Move all registered tensors to the specified device.
+    state_dict()
+        Return a dictionary containing the state of all registered tensors.
+    load_state_dict(state_dict)
+        Load the state of the registered tensors from a dictionary.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the Buffer instance.
+
+        This method initializes the Buffer instance by setting up the internal
+        dictionary to store registered tensors.
+        """
+        self._buffers: dict[str, torch.Tensor] = {}
+
+    def register(self, name: str, tensor: torch.Tensor) -> None:
+        """
+        Register a tensor with a given name.
+
+        This method registers a tensor under a specified name in the internal
+        dictionary of the Buffer instance. The tensor can later be accessed,
+        moved to a different device, or saved/loaded using the other methods
+        of the Buffer class.
+
+        Parameters
+        ----------
+        name : str
+            The name to register the tensor under.
+        tensor : torch.Tensor
+            The tensor to be registered.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+
+        Raises
+        ------
+        TypeError
+            If the provided tensor is not an instance of torch.Tensor.
+        """
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(f"Expected torch.Tensor, got {type(tensor)}")
+        self._buffers[name] = tensor
+
+    def __getitem__(self, name: str) -> torch.Tensor:
+        """
+        Retrieve a registered tensor by name.
+
+        This method allows access to a tensor that has been registered in the
+        Buffer instance using its name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the registered tensor to retrieve.
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor registered under the specified name.
+
+        Raises
+        ------
+        KeyError
+            If no tensor is registered under the specified name.
+        """
+        return self._buffers[name]
+
+    def to(self, device: torch.device | str) -> None:
+        """
+        Move all registered tensors to the specified device.
+
+        This method iterates over all tensors registered in the Buffer instance
+        and moves them to the specified device (e.g., CPU, GPU).
+
+        Parameters
+        ----------
+        device : torch.device
+            The device to move the tensors to.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
+        for name, tensor in self._buffers.items():
+            self._buffers[name] = tensor.to(device)
+
+    def state_dict(self) -> dict[str, torch.Tensor]:
+        """
+        Return a dictionary containing all registered tensors.
+
+        This method creates a dictionary where the keys are the names of the
+        registered tensors and the values are the tensors themselves, moved to
+        the CPU.
+
+        Returns
+        -------
+        dict[str, torch.Tensor]
+            A dictionary with tensor names as keys and tensors as values,
+            all moved to the CPU.
+        """
+        return {name: tensor.cpu() for name, tensor in self._buffers.items()}
+
+    def load_state_dict(self, state_dict: dict[str, torch.Tensor]) -> None:
+        """
+        Load tensors from a state dictionary.
+
+        This method takes a state dictionary, where the keys are tensor names
+        and the values are the corresponding tensors, and loads the tensors
+        into the Buffer instance.
+
+        Parameters
+        ----------
+        state_dict : dict[str, torch.Tensor]
+            A dictionary containing tensor names as keys and tensors as values.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
+        """
+        for name, tensor in state_dict.items():
+            self._buffers[name] = tensor
+
+
+class KeyController:
+    """
+    Standalone key controller for pause/resume/stop control in any loop.
+
+    This class provides a mechanism to control the execution of loops using
+    keyboard inputs. It supports pausing, resuming, and stopping the loop
+    based on user-defined key bindings. The class can be configured to use
+    separate keys for pause and resume or a single toggle key for both actions.
+
+    Parameters
+    ----------
+    key_bindings : dict, optional
+        A dictionary specifying the keys for controlling the loop. The default
+        is {'pause': 'p', 'resume': 'r', 'stop': 'q'} for separate pause and
+        resume keys, or {'toggle': ' ', 'stop': 'q'} if `use_toggle` is True.
+    use_toggle : bool, optional
+        If True, a single key is used to toggle between pause and resume states.
+        The default is False.
+
+    Attributes
+    ----------
+    stop_requested : bool
+        Indicates whether a stop has been requested.
+    pause_requested : bool
+        Indicates whether a pause has been requested.
+    use_toggle : bool
+        Determines if a single key is used for toggling pause and resume.
+
+    Methods
+    -------
+    check_pause()
+        Checks if a pause has been requested and waits until resumed.
+    close()
+        Restores the terminal to its original settings and stops the key listener.
+    restore_terminal()
+        Restores the terminal to its original settings.
+    """
+
+    stop_requested: bool
+    pause_requested: bool
+    use_toggle: bool
+    _closed: bool
+    fd: int | None
+    old_settings: list | None
+
+    def __init__(
+        self,
+        key_bindings: dict | None = None,
+        use_toggle: bool = False,
+    ):
+        """
+        Standalone key controller for pause/resume/stop control in any loop.
+
+        Parameters
+        ----------
+        key_bindings : dict, optional
+            {'pause': 'p', 'resume': 'r', 'stop': 'q'}
+            or {'toggle': ' ', 'stop': 'q'} if use_toggle is True.
+        use_toggle : bool, optional
+            Use a single key to toggle pause/resume.
+        """
+        self.stop_requested = False
+        self.pause_requested = False
+        self.use_toggle = use_toggle
+        self._closed = False
+
+        # Setup keys
+        default_keys = (
+            {"pause": "p", "resume": "r", "stop": "q"}
+            if not use_toggle
+            else {"toggle": " ", "stop": "q"}
+        )
+        self.keys = {**default_keys, **(key_bindings or {})}
+
+        # Terminal config
+        try:
+            self.fd = sys.stdin.fileno()
+            self.old_settings = termios.tcgetattr(self.fd)
+        except (termios.error, OSError):
+            print(
+                "[Warning] Failed to access terminal settings — key control disabled.",
+            )
+            self.fd = None
+            self.old_settings = None
+            return
+
+        # Register cleanup
+        atexit.register(self.close)
+
+        self.original_sigint_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, self._handle_sigint)
+
+        self._print_controls()
+        threading.Thread(target=self._key_listener, daemon=True).start()
+
+    def _print_controls(self) -> None:
+        """
+        Print the key controls for the user.
+
+        This method displays the key bindings to the user, indicating which
+        keys are used for pausing, resuming, and stopping the loop.
+        """
+        print("Key controls:")
+        for action, key in self.keys.items():
+            print(f"Press '{key}' to {action}.")
+
+    def _handle_sigint(self, _signum: int, _frame: FrameType | None) -> None:
+        """
+        Handle the SIGINT signal to stop the loop.
+
+        This method is called when a SIGINT signal is received (e.g., when
+        the user presses Ctrl+C). It sets the stop_requested flag to True.
+
+        Parameters
+        ----------
+        _signum : int
+            The signal number.
+        _frame : FrameType
+            The current stack frame.
+        """
+        self.stop_requested = True
+
+    def _key_listener(self) -> None:
+        """Listen for key presses to control the loop."""
+        if self.fd is None:
+            return
+        try:
+            tty.setcbreak(self.fd)
+            while not self.stop_requested:
+                try:
+                    key = sys.stdin.read(1)
+                except KeyboardInterrupt:
+                    self.stop_requested = True
+                    break
+
+                if self.use_toggle:
+                    self._handle_toggle_mode(key)
+                else:
+                    self._handle_separate_mode(key)
+        finally:
+            self.close()
+
+    def _handle_toggle_mode(self, key: str) -> None:
+        """
+        Handle the toggle mode.
+
+        This method handles the toggle mode, where a single key is used to toggle
+        between pause and resume states.
+
+        Parameters
+        ----------
+        key : str
+            The key pressed by the user.
+        """
+        if key == self.keys["toggle"]:
+            self.pause_requested = not self.pause_requested
+            print("[Paused]" if self.pause_requested else "[Resumed]")
+        elif key == self.keys["stop"]:
+            print("[Stop Requested]")
+            self.stop_requested = True
+
+    def _handle_separate_mode(self, key: str) -> None:
+        """
+        Handle the separate mode.
+
+        This method handles the separate mode, where separate keys are used for
+        pause and resume.
+
+        Parameters
+        ----------
+        key : str
+            The key pressed by the user.
+        """
+        if key == self.keys["pause"]:
+            if not self.pause_requested:
+                print(f"[Paused] Press '{self.keys['resume']}' to resume.")
+            self.pause_requested = True
+        elif key == self.keys["resume"]:
+            if self.pause_requested:
+                print("[Resumed]")
+            self.pause_requested = False
+        elif key == self.keys["stop"]:
+            print("[Stop Requested]")
+            self.stop_requested = True
+
+    def check_pause(self) -> None:
+        """Call this from inside your loop to respect pause/stop flags."""
+        if self.pause_requested:
+            print("[Paused] Waiting to resume...")
+        while self.pause_requested and not self.stop_requested:
+            plt.pause(0.1)
+
+    def close(self) -> None:
+        """Restore terminal and signal state safely (idempotent)."""
+        if self._closed:
+            return
+        self._closed = True
+        if self.fd is not None and self.old_settings is not None:
+            with contextlib.suppress(Exception):
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
+        with contextlib.suppress(Exception):
+            signal.signal(signal.SIGINT, self.original_sigint_handler)

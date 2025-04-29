@@ -16,6 +16,9 @@ Licensed under the GNU Lesser General Public License (LGPL) 2.1.
 See the LICENSE.LGPL file in the root directory for details.
 Original source: https://github.com/lululxvi/deepxde
 
+This module provides:
+- Jacobian: A class for computing Jacobian matrices.
+- Jacobians: A class for managing multiple Jacobian computations.
 """
 
 from abc import ABC, abstractmethod
@@ -34,10 +37,10 @@ class Jacobian(ABC):
 
     Parameters
     ----------
-        ys: torch.Tensor
-            Output Tensor of shape (batch_size, dim_y).
-        xs: torch.Tensor
-            Input Tensor of shape (batch_size, dim_x).
+    ys : torch.Tensor
+        Output Tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input Tensor of shape (batch_size, dim_x).
     """
 
     def __init__(self, ys: torch.Tensor, xs: torch.Tensor) -> None:
@@ -75,20 +78,39 @@ class Jacobian(ABC):
             j = 0
         if i is not None and not 0 <= i < self.dim_y:
             raise ValueError(f"i={i} is not valid.")
+
+        Parameters
+        ----------
+        i : int | None
+            The index of the row to return.
+        j : int | None
+            The index of the column to return.
         """
         raise NotImplementedError("This method should be implemented by the subclass.")
 
 
 class Jacobians:
     """
-    Compute multiple Jacobians.
+    Manage multiple Jacobian computations.
 
-    A new instance will be created for a new pair of (output, input). For the (output,
-    input) pair that has been computed before, it will reuse the previous instance,
-    rather than creating a new one.
+    This class provides functionality to manage and compute multiple Jacobian
+    matrices for a given set of inputs and outputs.
+
+    Parameters
+    ----------
+    jacobian_class : type
+        The class used to compute individual Jacobian matrices.
     """
 
     def __init__(self, jacobian_class: type[Jacobian]) -> None:
+        """
+        Initialize the Jacobians manager.
+
+        Parameters
+        ----------
+        jacobian_class : type
+            The class used to compute individual Jacobian matrices.
+        """
         self.jacobian_class = jacobian_class
         self.Js: dict = {}
 
@@ -109,22 +131,38 @@ class Jacobians:
         For backend pytorch, in each iteration, ys and xs are new tensors
         converted from np.ndarray, so self.Js will increase over iteration.
 
-        Example
+        Parameters
+        ----------
+        ys : torch.Tensor
+            Output tensor of shape (batch_size, dim_y).
+        xs : torch.Tensor
+            Input tensor of shape (batch_size, dim_x).
+        i : int | None
+            The index of the row to return.
+        j : int | None
+            The index of the column to return.
+
+        Returns
         -------
-        mydict = {}
+        torch.Tensor
+            The Jacobian matrix.
 
-        def f(x):
-            print(mydict)
-            y = 1 * x
-            print(hash(y), hash(x))
-            mydict[(y, x)] = 1
-            print(mydict)
-
-        for i in range(2):
-            x = np.random.random((3, 4))
-            x = torch.from_numpy(x)
-            x.requires_grad_()
-            f(x)
+        Examples
+        --------
+        >>> mydict = {}
+        >>>
+        >>> def f(x):
+        ...     print(mydict)
+        ...     y = 1 * x
+        ...     print(hash(y), hash(x))
+        ...     mydict[(y, x)] = 1
+        ...     print(mydict)
+        >>>
+        >>> for i in range(2):
+        ...     x = np.random.random((3, 4))
+        ...     x = torch.from_numpy(x)
+        ...     x.requires_grad_()
+        ...     f(x)
         """
         key = (ys, xs)
 

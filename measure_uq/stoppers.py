@@ -1,23 +1,11 @@
 """
 Defines classes for implementing stopping criteria in training.
 
-Classes:
---------
-Stopper : Abstract base class for defining a stopping criterion.
-    Provides an interface to set the trainer and check if training should stop.
-
-StopperList :
-    A list of Stopper instances, responsible for collectively determining when to halt
-    training.
-
-TrainingLossStopper :
-    A specific Stopper implementation that halts training based on the improvement of
-    training loss.
-
-Notes
------
-This module relies on the `Trainer` class from the `measure_uq.trainer` module.
-
+This module provides:
+    - Stopper class for defining a stopping criterion
+    - StopperList class for managing a list of stoppers
+    - TrainingLossStopper class for stopping training based on the improvement of
+    training loss
 """
 from __future__ import annotations
 
@@ -36,29 +24,22 @@ class Stopper(ABC):
     """
     Abstract base class for defining a stopping criterion.
 
-    Parameters
+    Attributes
     ----------
     trainer_data : TrainerData
         The trainer data instance containing the training losses and other relevant
         information.
-
-    Methods
-    -------
-    should_stop() : bool
-        Determine whether training should be stopped.
-
-    Returns
-    -------
-        bool
-            True if training should be stopped, False otherwise.
     """
 
-    trainer_data: TrainerData
-
     @abstractmethod
-    def should_stop(self) -> bool:
+    def should_stop(self, trainer_data: TrainerData) -> bool:
         """
         Determine whether training should be stopped.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data containing the data of the trainer.
 
         Returns
         -------
@@ -69,7 +50,7 @@ class Stopper(ABC):
 
 
 @dataclass(kw_only=True)
-class StopperList:
+class Stoppers:
     """
     A list of stoppers responsible for determining when to halt training.
 
@@ -78,6 +59,8 @@ class StopperList:
     stoppers : list of Stopper
         A list containing instances of Stopper.
     """
+
+    trainer_data: TrainerData
 
     stoppers: list[Stopper]
 
@@ -90,7 +73,7 @@ class StopperList:
         bool
             True if any stopper indicates to stop, False otherwise.
         """
-        return any(stopper.should_stop() for stopper in self.stoppers)
+        return any(stopper.should_stop(self.trainer_data) for stopper in self.stoppers)
 
 
 @dataclass(kw_only=True)
@@ -115,21 +98,32 @@ class TrainingLossStopper(Stopper):
     best_loss: float | None = None
     counter: int = 0
 
-    def should_stop(self) -> bool:
+    def should_stop(self, trainer_data: TrainerData) -> bool:
         """
         Determine whether training should be stopped based on the training loss.
 
+        This method checks if the training loss has improved by at least `delta` within
+        the last `patience` iterations. If there is no sufficient improvement for
+        `patience` consecutive iterations, it signals to stop training.
+
         Parameters
         ----------
-        trainer : measure_uq.trainer.Trainer
-            The trainer instance containing the training loss history.
+        trainer_data : TrainerData
+            The trainer data containing training loss history and other information.
 
         Returns
         -------
         bool
-            True if training should be stopped, False otherwise.
+            True if training should be stopped due to lack of improvement in loss,
+            False if training should continue.
+
+        Notes
+        -----
+        The method handles different loss value types (list, tuple, numpy array, scalar)
+        by converting them to float. The best loss value and counter are updated
+        internally to track progress.
         """
-        loss_value = self.trainer_data.losses_train.v[-1]
+        loss_value = trainer_data.losses_train.v[-1]
 
         if isinstance(loss_value, list | tuple):
             loss = float(loss_value[0])
@@ -145,6 +139,5 @@ class TrainingLossStopper(Stopper):
             self.counter += 1
             if self.counter >= self.patience:
                 print("TrainingLossStopper: early stop triggered")
-                print(self.trainer_data.losses_train.v[-self.patience :])
                 return True
         return False

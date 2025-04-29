@@ -1402,7 +1402,7 @@ files = [
   {file = "numpy-1.26.4.tar.gz", hash = "sha256:2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010"}
 ]
 groups = ["main"]
-markers = "sys_platform != \"linux\""
+markers = "sys_platform == \"darwin\""
 name = "numpy"
 optional = false
 python-versions = ">=3.9"
@@ -1468,7 +1468,7 @@ files = [
   {file = "numpy-2.2.4.tar.gz", hash = "sha256:9ba03692a45d3eef66559efe1d1096c4b9b75c0986b5dff5530c378fb8331d4f"}
 ]
 groups = ["main"]
-markers = "sys_platform == \"linux\""
+markers = "sys_platform != \"darwin\""
 name = "numpy"
 optional = false
 python-versions = ">=3.10"

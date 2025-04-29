@@ -34,6 +34,23 @@ module = [
   "torchvision"
 ]
 
+[tool.numpydoc_validation]
+checks = [
+  "all",  # report on all checks, except the below
+  "EX01",
+  "SA01",
+  "ES01"
+]
+exclude = [
+  './sandbox/*.py$'
+]
+override_SS05 = [
+  # override SS05 to allow docstrings starting with these words
+  '^Process ',
+  '^Assess ',
+  '^Access '
+]
+
 [tool.poetry.dependencies]
 chaospy = "^4.3.17"
 clearml = "^1.16.4"

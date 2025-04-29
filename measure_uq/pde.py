@@ -4,26 +4,11 @@ Partial Differential Equation (PDE) module.
 This module provides abstract base classes and implementations for defining and working
 with partial differential equations (PDEs) in the measure-uq package.
 
-The module includes:
-- Abstract base class for PDE definitions
-- Parameter management for PDE models
-- Utilities for boundary conditions and domain specifications
-
-Classes
--------
-PDE
-    Abstract base class for defining partial differential equations.
-
-Parameters
-----------
-    A class to manage parameter values used in PDE models.
-
-Notes
------
-This module forms the foundation for physics-informed neural networks (PINNs) by
-providing the mathematical framework for the differential equations that the neural
-networks aim to solve.
-
+The module provides:
+    - Parameters: A class to manage parameter values used in PDE models.
+    - Condition: A class to manage conditions in the PDE.
+    - Conditions: A class to manage a collection of conditions.
+    - PDE: A class to manage a PDE.
 """
 
 # ruff: noqa: S301
@@ -44,6 +29,7 @@ from measure_uq.utilities import (
     INT_INF,
     ArrayLike1DFloat,
     ArrayLike1DInt,
+    Buffer,
     SparseDynamicArray,
     extend_vector_tensor,
 )
@@ -52,9 +38,10 @@ from measure_uq.utilities import (
 @dataclass(kw_only=True)
 class Parameters:
     """
-    Manage parameter values used in a model.
+    Class for handling PDE parameters.
 
-    Ensuring they are ready for gradient ready for gradient computation.
+    This class provides methods to manage and manipulate parameters
+    used in partial differential equations.
 
     Attributes
     ----------
@@ -65,11 +52,12 @@ class Parameters:
     device : str
         The device to move the values of the parameters to.
 
-
     Methods
     -------
     sample_values():
         Should be implemented to assign sampled values to the `values` attribute.
+    to_device():
+        Move the `values` attribute to the device specified in the `device` attribute.
     """
 
     values: Tensor = field(init=True, repr=True, default_factory=torch.Tensor)
@@ -123,16 +111,31 @@ class Parameters:
 @dataclass(kw_only=True)
 class Condition(ABC):
     """
-    Abstract base class for defining conditions to be satisfied by a model.
+    Abstract base class for conditions in the PDE.
+
+    This class represents a condition in the PDE and provides methods to sample points,
+    move data to a specified device, and evaluate the condition using a given model
+    and parameters.
 
     Attributes
     ----------
-    points : Optional[Tensor]
-        A tensor containing points where the condition should be evaluated.
-        When `None`, the `sample_points` method is called to sample points.
-
+    points : Tensor
+        A tensor containing the points for the condition.
     loss : SparseDynamicArray
-        A container for storing loss values related to the condition.
+        A dynamic array to store the loss values.
+    buffer : Buffer
+        A buffer to store additional data for the condition.
+
+    Methods
+    -------
+    __post_init__()
+        Initialize the `points` attribute.
+    to(device: str)
+        Move the `points` and `buffer` attributes to the specified device.
+    sample_points()
+        Sample and assign data to the attribute `points`.
+    __call__(model: ModelWithCombinedInput, parameters: Tensor) -> Tensor
+        Evaluate the condition using the given model and parameters.
     """
 
     points: Tensor = field(init=True, repr=True, default_factory=torch.Tensor)
@@ -143,12 +146,18 @@ class Condition(ABC):
         default_factory=lambda: SparseDynamicArray(shape=1000, dtype=float),
     )
 
+    buffer: Buffer = field(init=False, repr=True, default_factory=Buffer)
+
     def __post_init__(self) -> None:
         """
-        Initialize the `points` attribute.
+        Initialize the Condition class.
 
         Ensures that the `points` attribute is initialized and ready for
         gradient computation. If not initialized, it attempts to sample points.
+
+        Important: A child class that implements a `__post_init__` method should
+        call the `super().__post_init__()` method at the end of the method to ensure
+        that the `points` attribute is initialized and ready for gradient computation.
         """
         if self.points.numel() == 0:
             self.sample_points()
@@ -165,6 +174,18 @@ class Condition(ABC):
             )
 
         self.points.requires_grad = True
+
+    def to(self, device: str) -> None:
+        """
+        Move the condition to the specified device.
+
+        Parameters
+        ----------
+        device : torch.device
+            The device to move the condition to.
+        """
+        self.points = self.points.to(device)
+        self.buffer.to(device)
 
     def sample_points(self) -> None:
         """
@@ -223,21 +244,15 @@ class Conditions:
     iterating through them, accessing individual conditions, and handling
     device placement and point sampling.
 
-    Parameters
-    ----------
-    conditions : list[Condition], optional
-        A list of condition objects to be managed. Default is an empty list.
-    device : str, optional
-        The device to place the condition points on. Default is "cpu".
-
     Attributes
     ----------
-    n : int
-        The number of conditions in the collection.
     conditions : list[Condition]
-        The list of condition objects.
+        A list of condition objects to be managed.
     device : str
-        The device where condition points are placed.
+        The device to place the condition points on.
+    n : int
+        The number of conditions in the collection, automatically set during
+        initialization.
 
     Notes
     -----
@@ -290,19 +305,26 @@ class Conditions:
         return self.conditions[index]
 
     def __len__(self) -> int:
-        """Return the number of conditions."""
+        """
+        Return the number of conditions.
+
+        Returns
+        -------
+        int
+            The number of conditions.
+        """
         return len(self.conditions)
 
     def to_device(self) -> None:
         """
-        Move all points of the conditions to a device.
+        Move all points and buffers of the conditions to a device.
 
         The device is specified in the `device` attribute. This method is called during
-        initialization and ensures that all condition points are on the correct device
-        for computation.
+        initialization and ensures that all condition points and buffers are on the
+        correct device for computation.
         """
         for condition in self.conditions:
-            condition.points = condition.points.to(self.device)
+            condition.to(self.device)
 
     def sample_points(self, iteration: int, resample_conditions_every: Tensor) -> None:
         """
@@ -328,7 +350,44 @@ class Conditions:
             if iteration % resample_conditions_every[i] == 0:
                 condition.sample_points()
                 condition.points.requires_grad = True
-                condition.points = condition.points.to(self.device)
+                condition.to(self.device)
+
+    def l2_loss(self, model: ModelWithCombinedInput, parameters: Tensor) -> Tensor:
+        """
+        Compute the L2 loss for the given model and parameters.
+
+        This method evaluates the conditions using the provided model and parameters,
+        and computes the L2 loss for each condition.
+
+        Parameters
+        ----------
+        model : ModelWithCombinedInput
+            The model to evaluate the conditions for.
+        parameters : Tensor
+            The parameters to use for the evaluation.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing the L2 loss for each condition.
+
+        Notes
+        -----
+        The L2 loss is computed as the mean of the squared L2 norm of the residuals
+        for each condition.
+        """
+        res = torch.zeros(self.n)
+        for i, condition in enumerate(self.conditions):
+            res[i] = torch.mean(
+                torch.linalg.vector_norm(
+                    condition(model, parameters),
+                    ord=2,
+                    dim=1,
+                )
+                ** 2,
+            )
+
+        return res
 
     def eval(
         self,
@@ -337,7 +396,7 @@ class Conditions:
         iteration: int,
     ) -> Tensor:
         """
-        Evaluate the conditions.
+        Evaluate the conditions and store the loss.
 
         Parameters
         ----------
@@ -360,9 +419,8 @@ class Conditions:
         condition. The results are then stored in the `loss` attribute of each
         condition.
         """
-        res = torch.zeros(self.n)
+        res = self.l2_loss(model, parameters)
         for i, condition in enumerate(self.conditions):
-            res[i] = torch.mean(condition(model, parameters) ** 2)
             condition.loss[iteration] = res[i].item()
 
         return res
@@ -377,7 +435,7 @@ class Conditions:
 
         This method is used by optimizers that require a closure function. It evaluates
         the conditions using the provided model and parameters, and returns the result
-        as a tensor.
+        as a tensor. It does not store the loss.
 
         Parameters
         ----------
@@ -391,42 +449,58 @@ class Conditions:
         Tensor
             The value of the conditions evaluated for the closure function.
         """
-        res = torch.zeros(self.n)
-        for i, condition in enumerate(self.conditions):
-            res[i] = torch.mean(condition(model, parameters) ** 2)
-
-        return res
+        return self.l2_loss(model, parameters)
 
 
 @dataclass(kw_only=True)
 class PDE:
     """
-    Abstract base class for physics-informed neural networks (PINNs) for PDEs.
+    A class representing a Partial Differential Equation (PDE).
 
-    Parameters
-    ----------
-    conditions_train : list[Condition]
-        A list of conditions to be satisfied by the model during training.
-    conditions_test : list[Condition]
-        A list of conditions to be satisfied by the model during testing.
-    parameters_train : Parameters
-        Parameters for the model during training.
-    parameters_test : Parameters
-        Parameters for the model during testing.
-    loss_weights : Optional[ArrayLike1DFloat], optional
-        Loss weights for conditions. If not given, equal weights are assigned.
-        by default None
-    resample_conditions_every : Optional[ArrayLike1DInt], optional
-        The number of iterations between resampling points for each condition.
-        If not given, parameters are sampled once at the beginning.
-        by default None
+    This class provides functionality for handling both training and testing aspects
+    of a PDE, including conditions, parameters, loss weights, and resampling strategies.
+    It manages the training and testing conditions separately, along with their
+    corresponding parameters, and provides methods for computing losses and resampling
+    data during the training process.
+
+    The class is designed to work with neural network models that solve PDEs, providing
+    a structured way to define the problem, compute losses, and handle the training
+    process. It supports dynamic resampling of both conditions and parameters, which
+    can help in achieving better training results by exploring different parts of the
+    solution space.
 
     Attributes
     ----------
+    conditions_train : Conditions
+        The conditions used for training the PDE.
+    conditions_test : Conditions
+        The conditions used for testing the PDE.
+    parameters_train : Parameters
+        The parameters used for training the PDE.
+    parameters_test : Parameters
+        The parameters used for testing the PDE.
     loss_weights_ : Tensor
-        The loss weights as a tensor.
+        The weights for each condition's loss, initialized during post-construction.
     resample_conditions_every_ : Tensor
-        The number of iterations between resampling points as a tensor.
+        The number of iterations between resampling points for each condition,
+        initialized during post-construction.
+    resample_parameters_every : int
+        The number of iterations between resampling parameters, default is infinity.
+
+    Methods
+    -------
+    resample_conditions(iteration: int)
+        Resample the training conditions based on the current iteration.
+    loss_train(model: ModelWithCombinedInput, iteration: int) -> Tensor
+        Compute the training loss for the given model and iteration.
+    loss_train_for_closure(model: ModelWithCombinedInput) -> Tensor
+        Compute the training loss for the given model.
+    loss_test(model: ModelWithCombinedInput, iteration: int = 0) -> Tensor
+        Compute the test loss for the given model and iteration.
+    save(filename: str | Path = "pde.pickle") -> None
+        Save the PDE to a file using pickling.
+    load(filename: str | Path) -> Self
+        Load a PDE instance from a file using pickling.
     """
 
     conditions_train: Conditions
@@ -507,10 +581,11 @@ class PDE:
         )
 
     def resample_conditions(self, iteration: int) -> None:
-        """Resample the training conditions based on the current iteration.
+        """
+        Resample the conditions for the PDE.
 
-        This method checks if the current iteration is a multiple of the resampling
-        interval for each condition. If so, it resamples the points for that condition.
+        This method updates the conditions by resampling them
+        according to the current state of the PDE.
 
         Parameters
         ----------
@@ -520,6 +595,7 @@ class PDE:
         Returns
         -------
         None
+            This method does not return anything.
         """
         self.conditions_train.sample_points(iteration, self.resample_conditions_every_)
 
@@ -546,7 +622,11 @@ class PDE:
         Tensor
             The computed training loss.
         """
-        res = self.conditions_train.eval(model, self.parameters_train.values, iteration)
+        res = self.conditions_train.eval(
+            model,
+            self.parameters_train.values,
+            iteration,
+        )
 
         return torch.dot(self.loss_weights_, res)
 
@@ -595,7 +675,11 @@ class PDE:
         Tensor
             The computed test loss.
         """
-        res = self.conditions_test.eval(model, self.parameters_test.values, iteration)
+        res = self.conditions_test.eval(
+            model,
+            self.parameters_test.values,
+            iteration,
+        )
 
         return torch.dot(self.loss_weights_, res)
 

@@ -23,7 +23,8 @@ def jacobian(
     i: int | None = None,
     j: int | None = None,
 ) -> torch.Tensor:
-    """Compute the Jacobian matrix of a tensor with respect to the input tensor.
+    """
+    Compute the Jacobian matrix of a tensor with respect to the input tensor.
 
     Compute `Jacobian matrix <https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant>`_
     J as J[i, j] = dy_i / dx_j, where i = 0, ..., dim_y - 1 and j = 0, ..., dim_x - 1.
@@ -37,17 +38,22 @@ def jacobian(
 
     Parameters
     ----------
-        ys: Output Tensor of shape (batch_size, dim_y).
-        xs: Input Tensor of shape (batch_size, dim_x).
-        i (int or None): i-th row. If i is ``None``, returns the j-th column
-            J[:, j].
-        j (int or None): j-th column. If j is ``None``, returns the i-th row
-            J[i, :], i.e., the gradient of y_i. i and j cannot be both ``None``,
-            unless J has only one element, which is returned.
+    ys : torch.Tensor
+        Output Tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input Tensor of shape (batch_size, dim_x).
+    i : int or None
+        The index of the row to return. If i is ``None``, returns the j-th column
+        J[:, j].
+    j : int or None
+        The index of the column to return. If j is ``None``, returns the i-th row
+        J[i, :], i.e., the gradient of y_i. i and j cannot be both ``None``,
+        unless J has only one element, which is returned.
 
     Returns
     -------
-        (i, j)th entry J[i, j], i-th row J[i, :], or j-th column J[:, j].
+    torch.Tensor
+        The Jacobian entry J[i, j], or i-th row J[i, :], or j-th column J[:, j].
     """
     return gradients_reverse.jacobian(ys, xs, i=i, j=j)
 
@@ -59,7 +65,8 @@ def hessian(
     i: int = 0,
     j: int = 0,
 ) -> torch.Tensor:
-    """Compute the Hessian matrix of a tensor with respect to the input tensor.
+    """
+    Compute the Hessian matrix of a tensor with respect to the input tensor.
 
     Compute Hessian matrix H as
     H[i, j] = d^2y / dx_i dx_j, where i,j = 0, ..., dim_x - 1.
@@ -73,15 +80,21 @@ def hessian(
 
     Parameters
     ----------
-        ys: Output Tensor of shape (batch_size, dim_y).
-        xs: Input Tensor of shape (batch_size, dim_x).
-        component: `ys[:, component]` is used as y to compute the Hessian.
-        i (int): i-th row.
-        j (int): j-th column.
+    ys : torch.Tensor
+        Output Tensor of shape (batch_size, dim_y).
+    xs : torch.Tensor
+        Input Tensor of shape (batch_size, dim_x).
+    component : int
+        `ys[:, component]` is used as y to compute the Hessian.
+    i : int
+        The index of the row to return.
+    j : int
+        The index of the column to return.
 
     Returns
     -------
-        H[`i`, `j`].
+    torch.Tensor
+        The Hessian entry H[i, j].
     """
     return gradients_reverse.hessian(ys, xs, component=component, i=i, j=j)
 

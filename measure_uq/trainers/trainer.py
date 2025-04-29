@@ -6,24 +6,21 @@ in the measure-uq package.
 
 The Trainer class handles the training loop, including callbacks for monitoring and
 logging, as well as stopping criteria to determine when training should end.
-
-Classes
--------
-Trainer
-    A class to manage the training process with callbacks and stopping criteria.
 """
 
 import pickle
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+import matplotlib.pyplot as plt
 import torch
 
-from measure_uq.callbacks import Callback, CallbackList
+from measure_uq.callbacks import Callbacks
 from measure_uq.gradients import clear
-from measure_uq.stoppers import Stopper, StopperList
+from measure_uq.stoppers import Stoppers
 from measure_uq.trainers.trainer_data import TrainerData
+from measure_uq.utilities import KeyController
 
 # ruff: noqa: S301
 
@@ -31,123 +28,174 @@ from measure_uq.trainers.trainer_data import TrainerData
 @dataclass(kw_only=True)
 class Trainer:
     """
-    A dataclass to manage the training process.
+    A class to manage the training process of models.
 
-    This class initializes the training configuration using provided trainer data
-    and optional callbacks and stoppers. The internal attributes `_callbacks` and
-    `_stoppers` are set up during initialization and are not directly exposed.
-
-    Parameters
-    ----------
-    trainer_data : TrainerData
-        The data required for training, including model, optimizer, and training
-        configurations.
-    callbacks : list[Callback] or None, optional
-        A list of callback objects to handle events during training. If None,
-        no callbacks are used. Default is None.
-    stoppers : list[Stopper] or None, optional
-        A list of stopper objects to handle stopping criteria during training.
-        If None, no stoppers are used. Default is None.
+    This class handles the training loop, including optimization steps, callbacks for
+    monitoring and logging, and stopping criteria. It provides methods for training,
+    evaluation, saving and loading model states.
 
     Attributes
     ----------
     trainer_data : TrainerData
-        The provided training data used during the training process.
-    _callbacks : CallbackList
-        An internal list of callbacks initialized during object creation.
-    _stoppers : StopperList
-        An internal list of stoppers initialized during object creation.
+        Contains all training-related data including the model, optimizer, scheduler,
+        loss history, and other configuration.
+    callbacks : Callbacks
+        A collection of callbacks that are triggered at specific points during training
+        to perform monitoring, logging, or other auxiliary tasks.
+    stoppers : Stoppers
+        A collection of stopping criteria that determine when training should end based
+        on various conditions.
+
+    Notes
+    -----
+    The training process can be controlled interactively using keyboard controls:
+    - Space bar to pause/resume training
+    - 'x' key to stop training
+
+    The class uses a closure-based optimization approach compatible with optimizers
+    that require it, such as LBFGS.
     """
 
     trainer_data: TrainerData
 
-    _callbacks: CallbackList = field(init=False)
+    callbacks: Callbacks | None = None
 
-    callbacks: InitVar[list[Callback] | None] = None
+    stoppers: Stoppers | None = None
 
-    _stoppers: StopperList = field(init=False)
-
-    stoppers: InitVar[list[Stopper] | None] = None
-
-    def __post_init__(
-        self,
-        callbacks: list[Callback] | None = None,
-        stoppers: list[Stopper] | None = None,
-    ) -> None:
+    def __post_init__(self) -> None:
         """
         Initialize the trainer after construction.
 
-        Parameters
-        ----------
-        callbacks : list[Callback] | None, optional
-            A list of callbacks to handle events during training. If None, an empty list
-            is used.
-        stoppers : list[Stopper] | None, optional
-            A list of stoppers to handle stopping criteria during training. If None,
-            an empty list is used.
-
-        Notes
-        -----
-        This method:
-        - Initializes the callback list and sets up each callback
-        - Initializes the stopper list
-        - Both callbacks and stoppers are stored in internal attributes
-        (_callbacks and _stoppers)
+        This method is automatically called after the trainer is instantiated.
+        It initializes the callbacks by calling their init() methods.
         """
-        if callbacks is None:
-            callbacks = []
-        self._callbacks = CallbackList(callbacks=callbacks)
-        self._callbacks.init()
+        self.callbacks = self.callbacks or Callbacks(
+            trainer_data=self.trainer_data,
+            callbacks=[],
+        )
 
-        if stoppers is None:
-            stoppers = []
-        self._stoppers = StopperList(stoppers=stoppers)
+        self.callbacks.init()
 
-    def train(self) -> None:
+        stoppers = self.stoppers or Stoppers(
+            trainer_data=self.trainer_data,
+            stoppers=[],
+        )
+        self.stoppers = stoppers
+
+    @property
+    def safe_callbacks(self) -> Callbacks:
         """
-        Train the model using the provided PDE, optimizer, and callbacks.
-
-        This method performs the training loop, which includes resampling conditions,
-        performing optimization steps, testing on training and test data, and invoking
-        callbacks and stoppers at appropriate stages.
-
-        Notes
-        -----
-        - The training loop continues until the specified number of iterations is
-          reached or a stopping criterion is met.
-        - The method invokes callbacks at the beginning and end of training, as well as
-          at the beginning and end of each iteration.
-        - The method also handles resampling conditions and updating the learning rate
-          scheduler if provided.
+        Get the callbacks property with type checking.
 
         Returns
         -------
-        None
+        Callbacks
+            The callbacks property.
         """
-        self._callbacks.on_train_begin()
+        assert self.callbacks is not None
+        return self.callbacks
 
-        while self.trainer_data.iteration < self.trainer_data.iterations:
-            self._callbacks.on_iteration_begin()
+    @property
+    def safe_stoppers(self) -> Stoppers:
+        """
+        Get the stoppers property with type checking.
 
-            self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
+        Returns
+        -------
+        Stoppers
+            The stoppers property.
+        """
+        assert self.stoppers is not None
+        return self.stoppers
 
-            self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
+    def one_train_step(self) -> None:
+        """
+        Perform a single training step.
 
-            if self.trainer_data.scheduler is not None:
-                self.trainer_data.scheduler.step()
+        This method executes one iteration of the training loop, which includes:
+        - Triggering the beginning of iteration callbacks.
+        - Resampling conditions for the PDE based on the current iteration.
+        - Performing an optimization step using the defined optimizer.
+        - Testing the model on the training data.
+        - Updating the learning rate scheduler.
+        - Testing the model on the test data.
+        - Triggering the end of iteration callbacks.
 
-            self.test_on_train()
+        Notes
+        -----
+        The method assumes that the optimizer has a `step` method that accepts a
+        closure.
+        """
+        self.safe_callbacks.on_iteration_begin()
 
-            self.test_on_test()
+        self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
 
-            self._callbacks.on_iteration_end()
+        self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
 
-            if self._stoppers.should_stop():
-                break
+        self.test_on_train()
+        self.step_scheduler()
+        self.test_on_test()
 
-            self.trainer_data.iteration += 1
+        self.safe_callbacks.on_iteration_end()
 
-        self._callbacks.on_train_end()
+    def train(self) -> None:
+        """
+        Train the model using the specified training loop.
+
+        This method manages the training process, including interactive controls
+        for pausing, resuming, and stopping the training loop. It iterates over
+        the training steps, checks for stopping criteria, and handles callbacks
+        at the beginning and end of training.
+
+        Interactive Controls:
+        - Press space to pause/resume the training loop.
+        - Press 'x' to stop the training loop.
+
+        Raises
+        ------
+        Exception
+            If an error occurs during the training process, it will be caught
+            and handled to ensure proper cleanup.
+
+        Notes
+        -----
+        - The method uses a `KeyController` for handling interactive controls.
+        - It triggers callbacks at the start and end of training, as well as
+          at each iteration.
+        - The training loop continues until the specified number of iterations
+          is reached or a stopping criterion is met.
+        """
+        controller = KeyController(
+            use_toggle=True,
+            key_bindings={"toggle": " ", "stop": "x"},
+        )
+
+        self.safe_callbacks.on_train_begin()
+
+        try:
+            while self.trainer_data.iteration < self.trainer_data.iterations:
+                controller.check_pause()
+
+                if controller.stop_requested:
+                    print("Stop requested. Exiting training loop.")
+                    break
+
+                self.one_train_step()
+
+                if self.safe_stoppers.should_stop():
+                    print("Stopping criteria met.")
+                    break
+
+                self.trainer_data.iteration += 1
+
+        finally:
+            controller.close()
+            self.safe_callbacks.on_train_end()
+
+            if plt.get_fignums():
+                plt.close("all")
+
+            print("Training finished and cleaned up.")
 
     def closure(self) -> torch.Tensor:
         """
@@ -174,19 +222,40 @@ class Trainer:
 
         return loss
 
-    def test_on_train(self) -> None:
-        """Evaluate the model on the training dataset and record the loss.
+    def step_scheduler(self) -> None:
+        """
+        Update the learning rate scheduler.
 
-        This method sets the model to evaluation mode, computes the training loss
-        for the current iteration, and stores the loss value in the trainer data.
-
-        Parameters
-        ----------
-        None
+        This method steps the learning rate scheduler if it is defined in the
+        trainer data. It is typically called after an optimization step to
+        adjust the learning rate according to the scheduler's policy.
 
         Returns
         -------
         None
+            This method does not return anything.
+        """
+        if self.trainer_data.scheduler is None:
+            return
+        if isinstance(
+            self.trainer_data.scheduler,
+            torch.optim.lr_scheduler.ReduceLROnPlateau,
+        ):
+            self.trainer_data.scheduler.step(self.trainer_data.losses_train.v[-1])  # type: ignore[arg-type]
+        else:
+            self.trainer_data.scheduler.step()
+
+    def test_on_train(self) -> None:
+        """
+        Evaluate the model on the training dataset and record the loss.
+
+        This method sets the model to evaluation mode, computes the training loss
+        for the current iteration, and stores the loss value in the trainer data.
+
+        Returns
+        -------
+        None
+            This method does not return anything.
         """
         self.trainer_data.model.eval()
         loss = self.trainer_data.pde.loss_train(
@@ -197,19 +266,17 @@ class Trainer:
         self.trainer_data.losses_train[self.trainer_data.iteration] = loss.item()
 
     def test_on_test(self) -> None:
-        """Evaluate the model on the test dataset and record the loss.
+        """
+        Evaluate the model on the test dataset and record the loss.
 
         This method sets the model to evaluation mode, computes the test loss
         for the current iteration if the iteration is a multiple of the test
         interval, and stores the loss value in the trainer data.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
+            This method does not return anything.
         """
         if (
             self.trainer_data.iteration % self.trainer_data.test_every == 0

@@ -11,7 +11,6 @@ The functions in this module are a modification of the `gradients` module,
 copied from `deepxde`. Licensed under the GNU Lesser General Public License
 (LGPL) 2.1. See the LICENSE.LGPL file in the root directory for details.
 Original source: https://github.com/lululxvi/deepxde
-
 """
 
 from measure_uq.gradients.gradients import clear, hessian, jacobian

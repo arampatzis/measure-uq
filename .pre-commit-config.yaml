@@ -49,6 +49,12 @@ repos:
     -   id: black
         language_version: python3.10
 
+-   repo: https://github.com/numpy/numpydoc
+    rev: v1.8.0
+    hooks:
+    -   id: numpydoc-validation
+        exclude: '^(sandbox/|^docs/)'
+
 -   repo: local
     hooks:
     -   id: mypy

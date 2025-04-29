@@ -22,6 +22,11 @@ class MockModule(torch.nn.Module):
     It provides a way to check if the forward method of the module was called with
     the correct arguments.
 
+    Parameters
+    ----------
+    return_value : torch.Tensor
+        The value to be returned by the mock forward method.
+
     Attributes
     ----------
     _mock : unittest.mock.MagicMock
@@ -29,16 +34,47 @@ class MockModule(torch.nn.Module):
     """
 
     def __init__(self, return_value: torch.Tensor) -> None:
+        """
+        Initialize the MockModule with a return value.
+
+        Parameters
+        ----------
+        return_value : torch.Tensor
+            The value to be returned by the mock forward method.
+        """
         super().__init__()
         self._mock = MagicMock()
         self._mock.return_value = return_value
 
     def forward(self, *args: Any, **kwargs: Any) -> torch.Tensor:
-        """Mock the forward method."""
+        """
+        Mock the forward method.
+
+        Parameters
+        ----------
+        *args : Any
+            Positional arguments passed to the forward method.
+        **kwargs : Any
+            Keyword arguments passed to the forward method.
+
+        Returns
+        -------
+        torch.Tensor
+            The mock return value.
+        """
         return self._mock(*args, **kwargs)
 
     def assert_called_with(self, *args: Any, **kwargs: Any) -> None:
-        """Assert that the forward method was called with the correct arguments."""
+        """
+        Assert that the forward method was called with the correct arguments.
+
+        Parameters
+        ----------
+        *args : Any
+            Positional arguments expected in the call.
+        **kwargs : Any
+            Keyword arguments expected in the call.
+        """
         self._mock.assert_called_with(*args, **kwargs)
 
 
