@@ -179,8 +179,7 @@ def feedforward_resnet(n: list[int]) -> nn.Sequential:
         nn.Tanh(),
     ]
 
-    for _ in range(depth - 1):
-        layers.append(ResidualBlock(width))  # noqa: PERF401
+    layers += [ResidualBlock(width) for _ in range(depth - 1)]
 
     output_layer = nn.Linear(width, output_dim)
     nn.init.xavier_uniform_(output_layer.weight)
@@ -446,9 +445,9 @@ class PINN_PCE(ModelWithCombinedInput):
 
         self.np = len(expansion)
 
-        assert (
-            n[-1] == self.np
-        ), "Last layer must match the polynomial expansion dimension."
+        assert n[-1] == self.np, (
+            "Last layer must match the polynomial expansion dimension."
+        )
 
         self.n = n
 

@@ -29,9 +29,9 @@ from measure_uq.models import PINN
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import (
     ConditionLossPanel,
-    LossPanel,
-    ResidualPanel,
-    SolutionComparisonPanel,
+    ResidualForODEsPanel,
+    SolutionComparisonODEsPanel,
+    TrainLossPanel,
 )
 from measure_uq.stoppers import Stoppers, TrainingLossStopper
 from measure_uq.trainers.trainer import Trainer
@@ -93,11 +93,11 @@ def train() -> None:
             ModularPlotCallback(
                 plot_every=20,
                 panels=[
-                    LossPanel,
+                    TrainLossPanel,
                     ConditionLossPanel,
-                    ResidualPanel,
+                    ResidualForODEsPanel,
                     (
-                        SolutionComparisonPanel,
+                        SolutionComparisonODEsPanel,
                         {"analytical_solution": analytical_solution},
                     ),
                 ],
@@ -137,11 +137,11 @@ def plot_loss() -> None:
             ModularPlotCallback(
                 plot_every=20,
                 panels=[
-                    LossPanel,
+                    TrainLossPanel,
                     ConditionLossPanel,
-                    ResidualPanel,
+                    ResidualForODEsPanel,
                     (
-                        SolutionComparisonPanel,
+                        SolutionComparisonODEsPanel,
                         {"analytical_solution": analytical_solution},
                     ),
                 ],

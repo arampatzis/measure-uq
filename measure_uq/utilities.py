@@ -28,7 +28,7 @@ import tty
 from collections.abc import Sequence
 from copy import deepcopy
 from types import FrameType
-from typing import Any, NewType
+from typing import Any, NewType, TypeAlias
 
 import matplotlib.pyplot as plt
 import numpoly
@@ -46,6 +46,8 @@ ArrayLike1DInt = (
 )
 
 PolyExpansion = NewType("PolyExpansion", numpoly.baseclass.ndpoly)  # type: ignore [valid-newtype]
+
+DeviceLikeType: TypeAlias = str | torch.device | int
 
 number_type = (int, float)
 array_type = (np.ndarray, list, tuple)
@@ -385,12 +387,9 @@ class DynamicArray:
 
         # add data
         if (
-            isinstance(index, int)
-            and index < 0
-            or isinstance(index, slice)
-            and (index.start < 0 or index.stop < 0)
-            or isinstance(index, tuple)
-            and any(i < 0 for i in index)
+            (isinstance(index, int) and index < 0)
+            or (isinstance(index, slice) and (index.start < 0 or index.stop < 0))
+            or (isinstance(index, tuple) and any(i < 0 for i in index))
         ):
             # handle negative indexing
             self.data[index] = value
@@ -1107,7 +1106,7 @@ class Buffer:
         """
         return self._buffers[name]
 
-    def to(self, device: torch.device | str) -> None:
+    def to(self, device: DeviceLikeType) -> None:
         """
         Move all registered tensors to the specified device.
 
@@ -1116,7 +1115,7 @@ class Buffer:
 
         Parameters
         ----------
-        device : torch.device
+        device : DeviceLikeType
             The device to move the tensors to.
 
         Returns

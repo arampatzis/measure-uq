@@ -7,6 +7,7 @@ This module provides:
     - TrainingLossStopper class for stopping training based on the improvement of
     training loss
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -213,10 +213,8 @@ class Hessian:
 
         if component >= dim_y:
             raise ValueError(
-                "The component of ys={} cannot be larger than the dimension={}.".format(
-                    component,
-                    dim_y,
-                ),
+                f"The component of ys={component} cannot be larger "
+                "than the dimension={dim_y}.",
             )
 
         # There is no duplicate computation of grad_y.

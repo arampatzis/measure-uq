@@ -4,10 +4,66 @@ Utilities for the trainer module.
 This module provides functions for creating optimizers and schedulers for
 training models.
 """
+
 from typing import Any
 
 import torch
 from torch import nn, optim
+
+from measure_uq.utilities import DeviceLikeType
+
+
+def is_model_fully_on_device(
+    model: torch.nn.Module,
+    device: DeviceLikeType,
+) -> bool:
+    """
+    Check if all parameters and buffers of a model are on the specified device.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to check.
+    device : DeviceLikeType
+        The device to check against.
+
+    Returns
+    -------
+    bool
+        True if all parameters and buffers are on the given device, False otherwise.
+    """
+    target_device = torch.device(device)
+    for t in list(model.parameters()) + list(model.buffers()):
+        if t.device != target_device:
+            return False
+    return True
+
+
+def are_tensors_on_device(
+    tensors: torch.Tensor | list[torch.Tensor] | tuple[torch.Tensor, ...],
+    device: DeviceLikeType,
+) -> bool:
+    """
+    Check if a tensor or a collection of tensors are on the specified device.
+
+    Parameters
+    ----------
+    tensors : torch.Tensor or list/tuple of torch.Tensor
+        Tensor or collection of tensors to check.
+    device : DeviceLikeType
+        Device to check against.
+
+    Returns
+    -------
+    bool
+        True if all tensors are on the given device, False otherwise.
+    """
+    target_device = torch.device(device)
+
+    if isinstance(tensors, torch.Tensor):
+        return tensors.device == target_device
+
+    return all(t.device == target_device for t in tensors)
 
 
 def get_optimizer(

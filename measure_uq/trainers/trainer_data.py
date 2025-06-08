@@ -18,7 +18,7 @@ from torch.optim.lr_scheduler import LRScheduler
 
 from measure_uq.models import ModelWithCombinedInput
 from measure_uq.pde import PDE
-from measure_uq.utilities import SparseDynamicArray
+from measure_uq.utilities import DeviceLikeType, SparseDynamicArray
 
 
 @dataclass(kw_only=True)
@@ -69,6 +69,8 @@ class TrainerData:
 
     test_every: int = 100
 
+    device: DeviceLikeType = "cpu"
+
     iteration: int = field(init=False, repr=True, default=0)
 
     losses_train: SparseDynamicArray = field(
@@ -82,3 +84,7 @@ class TrainerData:
         repr=True,
         default_factory=lambda: SparseDynamicArray(shape=1000, dtype=float),
     )
+
+    def __post_init__(self) -> None:
+        """Post-initialization method to move the model and optimizer to the device."""
+        self.model.to(self.device)

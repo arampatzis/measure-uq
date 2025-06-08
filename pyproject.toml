@@ -106,6 +106,7 @@ ignore = [
   "ANN",
   # flake8-commas
   "COM819",
+  "COM812",
   #
   "NPY002",
   "B027",

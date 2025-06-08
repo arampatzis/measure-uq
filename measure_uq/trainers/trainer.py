@@ -20,6 +20,7 @@ from measure_uq.callbacks import Callbacks
 from measure_uq.gradients import clear
 from measure_uq.stoppers import Stoppers
 from measure_uq.trainers.trainer_data import TrainerData
+from measure_uq.trainers.utilities import is_model_fully_on_device
 from measure_uq.utilities import KeyController
 
 # ruff: noqa: S301
@@ -81,6 +82,23 @@ class Trainer:
             stoppers=[],
         )
         self.stoppers = stoppers
+
+        device = self.trainer_data.device
+
+        if not is_model_fully_on_device(self.trainer_data.model, device):
+            raise ValueError(f"Model is not fully on device {device}")
+
+        if not self.trainer_data.pde.conditions_train.is_on_device(device):
+            raise ValueError(f"Train conditions are not on device {device}")
+
+        if not self.trainer_data.pde.conditions_test.is_on_device(device):
+            raise ValueError(f"Test conditions are not on device {device}")
+
+        if not self.trainer_data.pde.parameters_train.is_on_device(device):
+            raise ValueError(f"Train parameters are not on device {device}")
+
+        if not self.trainer_data.pde.parameters_test.is_on_device(device):
+            raise ValueError(f"Test parameters are not on device {device}")
 
     @property
     def safe_callbacks(self) -> Callbacks:

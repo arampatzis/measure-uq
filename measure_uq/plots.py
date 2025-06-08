@@ -16,6 +16,7 @@ This module provides:
     - LossPanel: Panel for displaying loss plots.
     - ConditionLossPanel: Panel for displaying condition loss plots.
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -242,7 +243,7 @@ def plot_ode_on_grid(
 
             print(
                 f"{i:03}: {p.tolist()}  --  "
-                f"l2 error: {torch.mean((u_exact - u_aprox)**2):.5e}",
+                f"l2 error: {torch.mean((u_exact - u_aprox) ** 2):.5e}",
             )
 
     return plot_1d_on_grid(data, figsize=figsize)
@@ -298,9 +299,9 @@ class BasePlotPanel:
 
 
 @dataclass(kw_only=True)
-class LossPanel(BasePlotPanel):
+class TrainLossPanel(BasePlotPanel):
     """
-    Panel for displaying loss plots.
+    Panel for displaying training loss plots.
 
     Inherits from BasePlotPanel to provide a specific implementation for
     plotting training and testing losses.
@@ -329,6 +330,46 @@ class LossPanel(BasePlotPanel):
         i = np.array(trainer_data.losses_train.i)
         v = np.array(trainer_data.losses_train.v)
         self.line.set_data(i, v)
+        self.relayout()
+
+
+@dataclass(kw_only=True)
+class TrainTestLossPanel(BasePlotPanel):
+    """
+    Panel for displaying training and testing loss plots.
+
+    Inherits from BasePlotPanel to provide a specific implementation for
+    plotting training and testing losses.
+    """
+
+    def __post_init__(self) -> None:
+        """Initialize the LossPanel."""
+        super().__post_init__()
+        self.line1 = self.ax.plot([], [], linewidth=3, label="Train Loss")[0]
+        self.line2 = self.ax.plot([], [], linewidth=3, label="Test Loss")[0]
+        self.ax.set_title("Total Loss")
+        self.ax.set_xlabel("Iteration")
+        self.ax.set_ylabel("Loss")
+        set_log_scale_with_latex(self.ax, axis="y")
+        self.ax.grid(True)
+        self.ax.legend()
+
+    def update(self, trainer_data: TrainerData) -> None:
+        """
+        Update the loss panel with new trainer data.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data to update the loss plot with.
+        """
+        i1 = np.array(trainer_data.losses_train.i)
+        v1 = np.array(trainer_data.losses_train.v)
+        i2 = np.array(trainer_data.losses_test.i)
+        v2 = np.array(trainer_data.losses_test.v)
+
+        self.line1.set_data(i1, v1)
+        self.line2.set_data(i2, v2)
         self.relayout()
 
 
@@ -374,16 +415,25 @@ class ConditionLossPanel(BasePlotPanel):
 
 
 @dataclass(kw_only=True)
-class ResidualPanel(BasePlotPanel):
+class ResidualForODEsPanel(BasePlotPanel):
     """
     Panel for displaying residual plots.
 
     Inherits from BasePlotPanel to provide a specific implementation for
     plotting residuals during training.
+
+    This panel can be user to visualize the absolute residual of all conditions before
+    averaging, of a system of ODEs.
+
+    Notes
+    -----
+    Plot the one dimensional array `residual` of the first condition in the
+    training data versus the `points` of the condition. It assumes that the
+    `points` array is ordered.
     """
 
     def __post_init__(self) -> None:
-        """Initialize the ResidualPanel."""
+        """Initialize the ResidualInSpacePanel."""
         super().__post_init__()
         self.ax.set_title("Residuals")
         self.ax.set_xlabel("Input")
@@ -426,7 +476,7 @@ class ResidualPanel(BasePlotPanel):
 
 
 @dataclass(kw_only=True)
-class SolutionComparisonPanel(BasePlotPanel):
+class SolutionComparisonODEsPanel(BasePlotPanel):
     """Plot the solution of the model and the analytical solution."""
 
     analytical_solution: Callable
@@ -499,3 +549,144 @@ class SolutionComparisonPanel(BasePlotPanel):
             self.relayout()
         except (ValueError, RuntimeError, IndexError) as e:
             print(f"[SolutionComparisonPanel] Warning: {e}")
+
+
+@dataclass(kw_only=True)
+class _ResidualForWaveTPanel(BasePlotPanel):
+    """
+    Panel for displaying residual plots.
+
+    Inherits from BasePlotPanel to provide a specific implementation for
+    plotting residuals during training.
+
+    This panel can be user to visualize the absolute residual of all conditions before
+    averaging, of a system of ODEs.
+
+    Notes
+    -----
+    Plot the one dimensional array `residual` of the first condition in the
+    training data versus the `points` of the condition. It assumes that the
+    `points` array is ordered.
+    """
+
+    def __post_init__(self) -> None:
+        """Initialize the ResidualInSpacePanel."""
+        super().__post_init__()
+        self.ax.set_title("Average Residual over parameters and space")
+        self.ax.set_xlabel("time")
+        self.ax.set_ylabel("Residual")
+        set_log_scale_with_latex(self.ax, axis="y")
+        self.ax.grid(True)
+        self.line: plt.Line2D | None = None
+
+    def update(self, trainer_data: TrainerData) -> None:
+        """
+        Update the residual panel with new trainer data.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data to update the residual plot with.
+
+        Notes
+        -----
+        It is assumed but not checked that the points are ordered in time and space
+        and are the same for every parameter.
+        """
+        try:
+            cond = trainer_data.pde.conditions_train[0]
+            Nt = getattr(cond, "Nt")  # noqa: B009
+            Nx = getattr(cond, "Nx")  # noqa: B009
+            Np = trainer_data.pde.parameters_train.values.shape[0]
+            points = cond.points.detach().cpu().numpy()
+            t = points[::Nx, 0]
+
+            try:
+                residual = getattr(cond, "residual")  # noqa: B009
+                res = residual.detach().cpu().numpy()
+            except AttributeError as e:
+                raise ValueError(
+                    "The condition does not have a residual attribute.",
+                ) from e
+
+            if not self.line:
+                (self.line,) = self.ax.plot([], [], linewidth=3)
+
+            res = np.array([res[k::Np, :].reshape(Nt, Nx) for k in range(Np)])
+
+            r_mean = np.mean(res, axis=0)
+
+            r_mean = np.mean(r_mean, axis=1)
+
+            self.line.set_data(t, np.abs(r_mean))
+            self.relayout()
+        except (AttributeError, IndexError, ValueError) as e:
+            print(f"[ResidualPanel] Warning: {e}")
+
+
+@dataclass(kw_only=True)
+class _ResidualForWaveXPanel(BasePlotPanel):
+    """
+    Panel for displaying residual plots.
+
+    Inherits from BasePlotPanel to provide a specific implementation for
+    plotting residuals during training.
+
+    This panel can be user to visualize the absolute residual of all conditions before
+    averaging, of a system of ODEs.
+
+    Notes
+    -----
+    Plot the one dimensional array `residual` of the first condition in the
+    training data versus the `points` of the condition. It assumes that the
+    `points` array is ordered.
+    """
+
+    def __post_init__(self) -> None:
+        """Initialize the ResidualInSpacePanel."""
+        super().__post_init__()
+        self.ax.set_title("Average Residual over parameters and time")
+        self.ax.set_xlabel("space")
+        self.ax.set_ylabel("Residual")
+        set_log_scale_with_latex(self.ax, axis="y")
+        self.ax.grid(True)
+        self.line: plt.Line2D | None = None
+
+    def update(self, trainer_data: TrainerData) -> None:
+        """
+        Update the residual panel with new trainer data.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data to update the residual plot with.
+        """
+        try:
+            cond = trainer_data.pde.conditions_train[0]
+            Nt = getattr(cond, "Nt")  # noqa: B009
+            Nx = getattr(cond, "Nx")  # noqa: B009
+            Np = trainer_data.pde.parameters_train.values.shape[0]
+            points = cond.points.detach().cpu().numpy()
+            x = points[:Nx, 1]
+
+            try:
+                residual = getattr(cond, "residual")  # noqa: B009
+                res = residual.detach().cpu().numpy()
+            except AttributeError as e:
+                raise ValueError(
+                    "The condition does not have a residual attribute.",
+                ) from e
+
+            if not self.line:
+                (self.line,) = self.ax.plot([], [], linewidth=3)
+
+            res = np.array([res[k::Np, :].reshape(Nt, Nx) for k in range(Np)])
+
+            r_mean = np.mean(res, axis=0)
+
+            r_mean = np.mean(r_mean, axis=0)
+
+            self.line.set_data(x, np.abs(r_mean))
+            self.relayout()
+        except (AttributeError, IndexError, ValueError) as e:
+            print(f"[ResidualPanel] Warning: {e}")

@@ -13,7 +13,6 @@ The module provides:
 
 # ruff: noqa: S301
 
-
 import pickle
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -30,6 +29,7 @@ from measure_uq.utilities import (
     ArrayLike1DFloat,
     ArrayLike1DInt,
     Buffer,
+    DeviceLikeType,
     SparseDynamicArray,
     extend_vector_tensor,
 )
@@ -49,7 +49,7 @@ class Parameters:
         A tensor containing parameter values. Should be initialized either
         directly or by the `sample_values` method to ensure it's ready for
         gradient computation.
-    device : str
+    device : DeviceLikeType
         The device to move the values of the parameters to.
 
     Methods
@@ -62,7 +62,7 @@ class Parameters:
 
     values: Tensor = field(init=True, repr=True, default_factory=torch.Tensor)
 
-    device: str = "cpu"
+    device: DeviceLikeType = "cpu"
 
     def __post_init__(self) -> None:
         """
@@ -104,8 +104,32 @@ class Parameters:
         This method is called in the `__post_init__` method to ensure the `values`
         attribute is on the correct device, and is ready for gradient computation.
         """
-        self.values.requires_grad = True
+        if self.values.is_leaf:
+            self.values.requires_grad = True
+
+        if not self.values.requires_grad:
+            raise ValueError(
+                "The attribute `values` is not a leaf tensor and "
+                "`requires_grad` cannot be set to True.",
+            )
+
         self.values = self.values.to(self.device)
+
+    def is_on_device(self, device: DeviceLikeType) -> bool:
+        """
+        Check if the `values` attribute is on the specified device.
+
+        Parameters
+        ----------
+        device : DeviceLikeType
+            The device to check against.
+
+        Returns
+        -------
+        bool
+            True if the `values` attribute is on the specified device, False otherwise.
+        """
+        return self.values.device == torch.device(device)
 
 
 @dataclass(kw_only=True)
@@ -175,13 +199,13 @@ class Condition(ABC):
 
         self.points.requires_grad = True
 
-    def to(self, device: str) -> None:
+    def to(self, device: DeviceLikeType) -> None:
         """
         Move the condition to the specified device.
 
         Parameters
         ----------
-        device : torch.device
+        device : DeviceLikeType
             The device to move the condition to.
         """
         self.points = self.points.to(device)
@@ -248,7 +272,7 @@ class Conditions:
     ----------
     conditions : list[Condition]
         A list of condition objects to be managed.
-    device : str
+    device : DeviceLikeType
         The device to place the condition points on.
     n : int
         The number of conditions in the collection, automatically set during
@@ -261,7 +285,7 @@ class Conditions:
     conditions.
     """
 
-    device: str = "cpu"
+    device: DeviceLikeType = "cpu"
 
     conditions: list[Condition] = field(init=True, repr=True, default_factory=list)
 
@@ -325,6 +349,26 @@ class Conditions:
         """
         for condition in self.conditions:
             condition.to(self.device)
+
+    def is_on_device(self, device: DeviceLikeType) -> bool:
+        """
+        Check if all points and buffers of the conditions are on the specified device.
+
+        Parameters
+        ----------
+        device : torch.device or str
+            The device to check against.
+
+        Returns
+        -------
+        bool
+            True if all points and buffers of the conditions are on the specified
+            device, False otherwise.
+        """
+        return all(
+            condition.points.device == torch.device(device)
+            for condition in self.conditions
+        )
 
     def sample_points(self, iteration: int, resample_conditions_every: Tensor) -> None:
         """
@@ -516,8 +560,8 @@ class PDE:
 
     def __post_init__(
         self,
-        loss_weights: ArrayLike1DFloat | None = None,
-        resample_conditions_every: ArrayLike1DInt | None = None,
+        loss_weights: ArrayLike1DFloat | None,
+        resample_conditions_every: ArrayLike1DInt | None,
     ) -> None:
         """
         Validate and initialize attributes after dataclass construction.
