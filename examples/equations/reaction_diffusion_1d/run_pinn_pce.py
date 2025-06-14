@@ -1,40 +1,62 @@
 #!/usr/bin/env python3
 r"""
-Solution of the heat equation on the line using a PINN-PCE method.
+Solve a nonlinear 1D reaction-diffusion equation with random coefficients.
 
 .. math::
-    u_t - a / k^2 u_xx = 0
-    u(0, x) = \sin(k x)
-    u(t, 0) = 0
-    u(t, \pi) = exp(-a t) \sin(\pi k)
+    \frac{\partial u}{\partial t}
+    - D \frac{\partial^2 u}{\partial x^2}
+    + g(x) u^3 = f(x),
+    \quad t \in [0, T],\ x \in [-1, 1]
+
+with:
+
+**Initial condition:**
+
+.. math::
+    u(0, x) = 0.5 \cos^2(\pi x)
+
+**Boundary conditions:**
+
+.. math::
+    u(t, -1) = u(t, 1) = 0.5
+
+**Reaction coefficient:**
+
+.. math::
+    g(x) = 0.2 + e^{r_1 x} \cos^2(r_2 x),\quad
+    r_1 \sim \mathcal{U}(0.5, 1),\quad
+    r_2 \sim \mathcal{U}(3, 4)
+
+**Forcing term:**
+
+.. math::
+    f(x) = \exp\left( -\frac{(x - 0.25)^2}{2 k_1^2} \right) \sin^2(k_2 x),\quad
+    k_1 \sim \mathcal{U}(0.2, 0.8),\quad
+    k_2 \sim \mathcal{U}(1, 4)
 """
 
 import chaospy
-import click
-import matplotlib.pyplot as plt
-import numpy as np
 from chaospy import J
 from torch import optim
 
-from examples.equations.heat_1d.pde import (
+from examples.equations.reaction_diffusion_1d.pde import (
     BoundaryConditionLeft,
     BoundaryConditionRight,
     InitialCondition,
     RandomParameters,
     Residual,
 )
-from examples.equations.heat_1d.plot import plot
 from measure_uq.callbacks import (
     CallbackLog,
     Callbacks,
     ModularPlotCallback,
 )
 from measure_uq.models import PINN_PCE
+from measure_uq.networks import FeedforwardBuilder
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import (
     ConditionLossPanel,
     TrainTestLossPanel,
-    plot_losses,
 )
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
@@ -43,12 +65,14 @@ from measure_uq.trainers.trainer_data import TrainerData
 def train() -> None:
     """Train the PINN-PCE."""
     joint = J(
-        chaospy.Uniform(1, 3),
-        chaospy.Uniform(1, 3),
+        chaospy.Uniform(0.5, 1),
+        chaospy.Uniform(3, 4),
+        chaospy.Uniform(0.2, 0.8),
+        chaospy.Uniform(1, 4),
     )
 
     expansion = chaospy.generate_expansion(
-        5,
+        10,
         joint,
         normed=True,
     )
@@ -56,18 +80,20 @@ def train() -> None:
     device = "cuda:0"
 
     model = PINN_PCE(
-        [2, 20, 20, 20, 20, 20, 20, len(expansion)],
-        expansion,
-    ).to(device)
+        network_builder=FeedforwardBuilder(
+            layer_sizes=[2, 20, 20, 20, 20, 20, 20, len(expansion)],
+            activation="tanh",
+        ),
+        expansion=expansion,
+    )
 
-    T = 1.0
-    X = np.pi
+    T = 4.0
 
     conditions = [
-        Residual(Nt=10, Nx=20, T=T, X=X),
-        InitialCondition(Nx=20, X=X),
+        Residual(Nt=10, Nx=20, T=T),
+        InitialCondition(Nx=20),
         BoundaryConditionLeft(Nt=20, T=T),
-        BoundaryConditionRight(Nt=20, T=T, X=X),
+        BoundaryConditionRight(Nt=20, T=T),
     ]
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
@@ -80,16 +106,19 @@ def train() -> None:
         conditions_test=conditions_test,
         parameters_train=parameters_train,
         parameters_test=parameters_test,
-        resample_conditions_every=(50,),
-        resample_parameters_every=100,
+        resample_conditions_every=(100,),
+        resample_parameters_every=200,
+        loss_weights=[5.0, 1.0, 1.0, 1.0],
     )
+    pde.save("data/pde_pinn_pce.pickle")
 
     trainer_data = TrainerData(
         pde=pde,
         iterations=5000,
         model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=5, history_size=5, lr=1),
-        test_every=10,
+        optimizer=optim.LBFGS(model.parameters(), max_iter=20, history_size=20, lr=1),
+        test_every=20,
+        save_path="data/best_model_pinn_pce.pickle",
         device=device,
     )
 
@@ -98,7 +127,7 @@ def train() -> None:
         callbacks=[
             CallbackLog(print_every=10),
             ModularPlotCallback(
-                plot_every=100,
+                plot_every=10,
                 panels=[
                     TrainTestLossPanel,
                     ConditionLossPanel,
@@ -119,36 +148,5 @@ def train() -> None:
     trainer.save("data/trainer_pinn_pce.pickle")
 
 
-def plot_all() -> None:
-    """Plot the solution of the PDE."""
-    trainer = Trainer.load("data/trainer_pinn_pce.pickle")
-    fig1, ax1 = plot_losses(trainer.trainer_data)
-
-    fig2, ax2, anime = plot(
-        model_path="data/model_pinn_pce.pt",
-        pde_path="data/pde_pinn_pce.pickle",
-        model_type=PINN_PCE,
-    )
-
-    plt.show()
-
-
-@click.command()
-@click.option("--plot", is_flag=True, help="Run the plot function instead of training.")
-def main(plot: bool) -> None:
-    """
-    Run the training or plotting.
-
-    Parameters
-    ----------
-    plot : bool
-        If True, run the plotting function.
-    """
-    if plot:
-        plot_all()
-    else:
-        train()
-
-
 if __name__ == "__main__":
-    main()
+    train()

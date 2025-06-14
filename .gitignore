@@ -13,6 +13,9 @@ temp/
 **/*.pickle
 **/*.npz
 
+**/*.mp4
+**/*.pdf
+
 docs/build/
 docs/source/examples/
 docs/source/measure_uq/

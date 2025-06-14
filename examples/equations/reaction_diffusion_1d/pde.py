@@ -1,11 +1,37 @@
 r"""
-Description of the heat equation on the line.
+Solve a nonlinear 1D reaction-diffusion equation with random coefficients.
 
 .. math::
-    u_t - a / k^2 u_xx = 0
-    u(0, x) = \sin(k x)
-    u(t, 0) = 0
-    u(t, \pi) = exp(-a t) \sin(\pi k)
+    \frac{\partial u}{\partial t}
+    - D \frac{\partial^2 u}{\partial x^2}
+    + g(x) u^3 = f(x),
+    \quad t \in [0, T],\ x \in [-1, 1]
+
+with:
+
+**Initial condition:**
+
+.. math::
+    u(0, x) = 0.5 \cos^2(\pi x)
+
+**Boundary conditions:**
+
+.. math::
+    u(t, -1) = u(t, 1) = 0.5
+
+**Reaction coefficient:**
+
+.. math::
+    g(x) = 0.2 + e^{r_1 x} \cos^2(r_2 x),\quad
+    r_1 \sim \mathcal{U}(0.5, 1),\quad
+    r_2 \sim \mathcal{U}(3, 4)
+
+**Forcing term:**
+
+.. math::
+    f(x) = \exp\left( -\frac{(x - 0.25)^2}{2 k_1^2} \right) \sin^2(k_2 x),\quad
+    k_1 \sim \mathcal{U}(0.2, 0.8),\quad
+    k_2 \sim \mathcal{U}(1, 4)
 """
 
 from dataclasses import dataclass, field
@@ -13,6 +39,7 @@ from dataclasses import dataclass, field
 import chaospy
 import numpy as np
 import torch
+from scipy.integrate import solve_ivp
 from torch import Tensor, tensor
 
 from measure_uq.gradients import jacobian
@@ -20,34 +47,110 @@ from measure_uq.pde import Condition, Parameters
 from measure_uq.utilities import cartesian_product_of_rows
 
 
-def analytical_solution(
-    t: torch.Tensor | np.ndarray,
-    x: torch.Tensor | np.ndarray,
-    p: torch.Tensor | np.ndarray,
-) -> torch.Tensor | np.ndarray:
+def reference_solution(
+    t: np.ndarray,
+    x: np.ndarray,
+    p: np.ndarray,
+    D: float,
+) -> np.ndarray:
     """
-    Compute the analytical solution of the heat equation.
+    Analytical solution of the reaction-diffusion equation.
 
     Parameters
     ----------
-    t : torch.Tensor | np.ndarray
-        Time coordinates.
-    x : torch.Tensor | np.ndarray
-        Spatial coordinates.
-    p : torch.Tensor | np.ndarray
-        Parameters of the PDE, where p[0] is the thermal diffusivity.
+    t : np.ndarray
+        Time points.
+    x : np.ndarray
+        Spatial points.
+    p : np.ndarray
+        Parameters of the reaction-diffusion equation.
+    D : float
+        Diffusion coefficient.
 
     Returns
     -------
-    torch.Tensor | np.ndarray
-        The analytical solution of the heat equation at the given coordinates.
+    np.ndarray
+        Numerical solution of the reaction-diffusion equation of shape (Nx, Nt).
     """
-    if isinstance(t, torch.Tensor) and isinstance(x, torch.Tensor):
-        tt, xx = torch.meshgrid(t.squeeze(), x.squeeze(), indexing="ij")
-        return torch.exp(-p[0] * tt) * torch.sin(p[1] * xx)
+    dx = x[1] - x[0]
+    Nx = len(x)
+    t_eval = t
 
-    ttt, xxx = np.meshgrid(t.squeeze(), x.squeeze(), indexing="ij")
-    return np.exp(-p[0] * ttt) * np.sin(p[1] * xxx)
+    r1, r2, k1, k2 = p
+
+    g = 0.2 + np.exp(r1 * x) * np.cos(r2 * x) ** 2
+    f = np.exp(-((x - 0.25) ** 2) / (2 * k1**2)) * np.sin(k2 * x) ** 2
+
+    u0 = 0.5 * np.cos(np.pi * x) ** 2
+
+    def apply_bc(u: np.ndarray) -> np.ndarray:
+        """
+        Apply boundary conditions.
+
+        Parameters
+        ----------
+        u : np.ndarray
+            Solution tensor.
+
+        Returns
+        -------
+        Tensor
+            Solution tensor with boundary conditions applied.
+        """
+        u[0] = 0.5
+        u[-1] = 0.5
+        return u
+
+    def laplacian_matrix(N: int, dx: float) -> np.ndarray:
+        """
+        Laplacian matrix.
+
+        Parameters
+        ----------
+        N : int
+            Number of spatial points.
+        dx : float
+            Spatial step size.
+
+        Returns
+        -------
+        np.ndarray
+            Laplacian matrix.
+        """
+        L = np.zeros((N, N))
+        for i in range(1, N - 1):
+            L[i, i - 1] = 1
+            L[i, i] = -2
+            L[i, i + 1] = 1
+        return L / dx**2
+
+    L_mat = laplacian_matrix(Nx, dx)
+
+    def rhs(_: np.ndarray, u: np.ndarray) -> np.ndarray:
+        """
+        Right-hand side of the reaction-diffusion equation.
+
+        Parameters
+        ----------
+        _ : np.ndarray
+            Input coordinates tensor.
+        u : np.ndarray
+            Solution tensor.
+
+        Returns
+        -------
+        np.ndarray
+            Right-hand side of the reaction-diffusion equation.
+        """
+        u = apply_bc(u.copy())
+        du = D * (L_mat @ u) - g * u**3 + f
+        du[0] = 0.0
+        du[-1] = 0.0
+        return du
+
+    sol = solve_ivp(rhs, [t[0], t[-1]], u0, t_eval=t_eval, method="RK45")
+
+    return sol.y
 
 
 @dataclass(kw_only=True)
@@ -75,7 +178,7 @@ class Residual(Condition):
     Nt: int
     Nx: int
     T: float
-    X: float
+    D: float = 0.01
 
     residual: Tensor = field(init=False, default_factory=lambda: torch.tensor([]))
 
@@ -91,7 +194,7 @@ class Residual(Condition):
 
         self.points = cartesian_product_of_rows(
             tensor(np.random.uniform(0, self.T, (self.Nt, 1))),
-            tensor(np.random.uniform(0, self.X, (self.Nx, 1))),
+            tensor(np.random.uniform(-1, 1, (self.Nx, 1))),
         ).float()
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
@@ -116,12 +219,20 @@ class Residual(Condition):
         dy_dx = jacobian(y, x, j=1)
         dy_d2 = jacobian(dy_dx, x, j=1)
 
-        c = x[:, 2][:, None] / x[:, 3][:, None] ** 2
-        f = c * dy_d2
+        xx = x[:, 1][:, None]
+        r1 = x[:, 2][:, None]
+        r2 = x[:, 3][:, None]
+        k1 = x[:, 4][:, None]
+        k2 = x[:, 5][:, None]
 
-        assert dy_dt.shape == f.shape
+        g = 0.2 + torch.exp(r1 * xx) * torch.cos(r2 * xx) ** 2
+        f = torch.exp(-((xx - 0.25) ** 2) / (2 * k1**2)) * torch.sin(k2 * xx) ** 2
 
-        return dy_dt - f
+        rhs = self.D * dy_d2 - g * y**3 + f
+
+        assert dy_dt.shape == rhs.shape
+
+        return dy_dt - rhs
 
 
 @dataclass(kw_only=True)
@@ -139,14 +250,13 @@ class InitialCondition(Condition):
     """
 
     Nx: int
-    X: float
 
     def sample_points(self) -> None:
         """Sample points for the initial condition of the PDE."""
         print("Re-sample PDE variables for InitialCondition")
         self.points = cartesian_product_of_rows(
             torch.tensor([[0.0]]),
-            tensor(np.random.uniform(0, self.X, (self.Nx, 1))),
+            tensor(np.random.uniform(-1, 1, (self.Nx, 1))),
         ).float()
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
@@ -167,9 +277,9 @@ class InitialCondition(Condition):
         """
         assert x.shape[0] == y.shape[0]
 
-        kx = x[:, 3][:, None] * x[:, 1][:, None]
+        xx = x[:, 1][:, None]
 
-        return y - torch.sin(kx)
+        return y - 0.5 * torch.cos(np.pi * xx) ** 2
 
 
 @dataclass(kw_only=True)
@@ -194,7 +304,7 @@ class BoundaryConditionLeft(Condition):
         print("Re-sample PDE variables for BoundaryConsitionLeft")
         self.points = cartesian_product_of_rows(
             tensor(np.random.uniform(0, self.T, (self.Nt, 1))),
-            torch.tensor([[0.0]]),
+            torch.tensor([[-1.0]]),
         ).float()
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:  # noqa: ARG002
@@ -213,7 +323,7 @@ class BoundaryConditionLeft(Condition):
         Tensor
             The difference between the predicted and true boundary condition.
         """
-        return y
+        return y - 0.5
 
 
 @dataclass(kw_only=True)
@@ -232,23 +342,22 @@ class BoundaryConditionRight(Condition):
 
     Nt: int
     T: float
-    X: float
 
     def sample_points(self) -> None:
         """Sample points for the boundary condition at the right boundary of the PDE."""
         print("Re-sample PDE variables for BoundaryConsitionRight")
         self.points = cartesian_product_of_rows(
             tensor(np.random.uniform(0, self.T, (self.Nt, 1))),
-            torch.tensor([[self.X]]),
+            torch.tensor([[1.0]]),
         ).float()
 
-    def eval(self, x: Tensor, y: Tensor) -> Tensor:
+    def eval(self, _: Tensor, y: Tensor) -> Tensor:
         """
         Evaluate the boundary condition at the right boundary of the PDE.
 
         Parameters
         ----------
-        x : Tensor
+        _ : Tensor
             Input coordinates tensor.
         y : Tensor
             Output values tensor.
@@ -258,10 +367,7 @@ class BoundaryConditionRight(Condition):
         Tensor
             The difference between the predicted and true boundary condition.
         """
-        at = x[:, 2][:, None] * x[:, 0][:, None]
-        kpi = self.X * x[:, 3][:, None]
-
-        return y - torch.exp(-at) * torch.sin(kpi)
+        return y - 0.5
 
 
 @dataclass(kw_only=True)

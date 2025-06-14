@@ -12,6 +12,7 @@ This module provides:
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import torch
 from torch.optim.lr_scheduler import LRScheduler
@@ -73,6 +74,11 @@ class TrainerData:
 
     iteration: int = field(init=False, repr=True, default=0)
 
+    save_path: str | Path = field(
+        repr=True,
+        default="data/best_model.pickle",
+    )
+
     losses_train: SparseDynamicArray = field(
         init=False,
         repr=True,
@@ -84,6 +90,8 @@ class TrainerData:
         repr=True,
         default_factory=lambda: SparseDynamicArray(shape=1000, dtype=float),
     )
+
+    best_test_loss: float = field(init=False, repr=True, default=float("inf"))
 
     def __post_init__(self) -> None:
         """Post-initialization method to move the model and optimizer to the device."""

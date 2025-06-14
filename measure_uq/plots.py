@@ -408,6 +408,7 @@ class ConditionLossPanel(BasePlotPanel):
             if key not in self.lines:
                 (line,) = self.ax.plot([], [], label=c.__class__.__name__, linewidth=3)
                 self.lines[key] = line
+
             self.lines[key].set_data(c.loss.i, c.loss.v)
 
         self.ax.legend()

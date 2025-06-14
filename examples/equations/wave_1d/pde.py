@@ -25,7 +25,7 @@ from measure_uq.pde import Condition, Parameters
 from measure_uq.utilities import cartesian_product_of_rows
 
 
-def analytical_solution(
+def reference_solution(
     t: torch.Tensor | np.ndarray,
     x: torch.Tensor | np.ndarray,
     p: torch.Tensor | np.ndarray,
@@ -50,12 +50,10 @@ def analytical_solution(
     """
     p = p.squeeze()
 
-    if isinstance(t, torch.Tensor) and isinstance(x, torch.Tensor):
-        tt, xx = torch.meshgrid(t.squeeze(), x.squeeze(), indexing="ij")
-        return torch.sin(p[1] * xx) * torch.cos(torch.sqrt(p[0]) * p[1] * tt)
+    tt, xx = np.meshgrid(t.squeeze(), x.squeeze(), indexing="ij")
+    y = np.sin(p[1] * xx) * np.cos(np.sqrt(p[0]) * p[1] * tt)
 
-    ttt, xxx = np.meshgrid(t.squeeze(), x.squeeze(), indexing="ij")
-    return np.sin(p[1] * xxx) * np.cos(np.sqrt(p[0]) * p[1] * ttt)
+    return y.T
 
 
 def analytical_solution_2(
@@ -317,6 +315,7 @@ class BoundaryConditionRight(Condition):
         print("Re-sample PDE variables for BoundaryConditionRight")
         self.points = cartesian_product_of_rows(
             tensor(np.random.uniform(0, self.T, (self.Nt, 1))),  # t values
+            torch.tensor([[self.X]]),  # x values
         ).float()
 
     def eval(self, x: Tensor, y: Tensor) -> Tensor:
@@ -365,10 +364,9 @@ class RandomParameters(Parameters):
 
     def __post_init__(self) -> None:
         """Initialize the parameters of the PDE."""
-        self.values = tensor(self.joint.sample(self.N).T).float()
         super().__post_init__()
 
     def sample_values(self) -> None:
         """Re-sample the parameters of the PDE."""
         print("Re-sample PDE parameters")
-        self.values = self.values
+        self.values = tensor(self.joint.sample(self.N).T).float()

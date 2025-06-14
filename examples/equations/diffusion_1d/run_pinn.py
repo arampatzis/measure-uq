@@ -10,26 +10,24 @@ Solution of the heat equation on the line using a PINN.
 """
 
 import chaospy
-import click
-import matplotlib.pyplot as plt
 import numpy as np
 from chaospy import J
 from torch import optim
 
-from examples.equations.heat_1d.pde import (
+from examples.equations.diffusion_1d.pde import (
     BoundaryConditionLeft,
     BoundaryConditionRight,
     InitialCondition,
     RandomParameters,
     Residual,
 )
-from examples.equations.heat_1d.plot import plot
 from measure_uq.callbacks import (
     CallbackLog,
     Callbacks,
     ModularPlotCallback,
 )
 from measure_uq.models import PINN
+from measure_uq.networks import FeedforwardBuilder
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import (
     ConditionLossPanel,
@@ -50,7 +48,10 @@ def train() -> None:
     device = "cuda:0"
 
     model = PINN(
-        [4, 20, 20, 20, 20, 20, 20, 1],
+        network_builder=FeedforwardBuilder(
+            layer_sizes=[4, 20, 20, 20, 20, 20, 20, 1],
+            activation="snake",
+        ),
     ).to(device)
 
     T = 1.0
@@ -88,6 +89,7 @@ def train() -> None:
             lr=1,
         ),
         test_every=40,
+        save_path="data/best_model_pinn.pickle",
         device=device,
     )
 
@@ -124,32 +126,5 @@ def train() -> None:
     trainer.save("data/trainer_pinn.pickle")
 
 
-def plot_all() -> None:
-    """Plot the solution of the PDE."""
-    fig2, ax2, anime = plot(
-        model_path="data/model_pinn.pickle",
-        pde_path="data/pde_pinn.pickle",
-        model_type=PINN,
-    )
-    plt.show()
-
-
-@click.command()
-@click.option("--plot", is_flag=True, help="Run the plot function instead of training.")
-def main(plot: bool) -> None:
-    """
-    Run the training or plotting.
-
-    Parameters
-    ----------
-    plot : bool
-        If True, run the plotting function.
-    """
-    if plot:
-        plot_all()
-    else:
-        train()
-
-
 if __name__ == "__main__":
-    main()
+    train()

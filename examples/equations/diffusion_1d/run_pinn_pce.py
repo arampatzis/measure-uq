@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 r"""
-Solution of the wave equation on the line using a PINN.
+Solution of the heat equation on the line using a PINN-PCE method.
 
 .. math::
-    u_{tt} - a u_{xx} = 0, \quad (t,x) \in [0,T] \times [0,X]
-
+    u_t - a / k^2 u_xx = 0
     u(0, x) = \sin(k x)
-
-    u_t(0, x) = 0, \quad x \in [0,X]
-
-    u(t, 0) = 0, \quad t \in [0,T]
-
-    u(t, X) = \sin(k X) \cos(\sqrt{a} k t), \quad t \in [0,T]
+    u(t, 0) = 0
+    u(t, \pi) = exp(-a t) \sin(\pi k)
 """
 
 import chaospy
@@ -19,11 +14,10 @@ import numpy as np
 from chaospy import J
 from torch import optim
 
-from examples.equations.wave_1d.pde import (
+from examples.equations.diffusion_1d.pde import (
     BoundaryConditionLeft,
     BoundaryConditionRight,
     InitialCondition,
-    InitialVelocity,
     RandomParameters,
     Residual,
 )
@@ -51,7 +45,7 @@ def train() -> None:
     )
 
     expansion = chaospy.generate_expansion(
-        10,
+        5,
         joint,
         normed=True,
     )
@@ -60,21 +54,20 @@ def train() -> None:
 
     model = PINN_PCE(
         network_builder=FeedforwardBuilder(
-            layer_sizes=[2, 64, 64, 64, 64, 64, len(expansion)],
-            activation="tanh",
+            layer_sizes=[2, 20, 20, 20, 20, 20, 20, len(expansion)],
+            activation="snake",
         ),
         expansion=expansion,
-    )
+    ).to(device)
 
-    T = 2.0
+    T = 1.0
     X = np.pi
 
     conditions = [
-        Residual(X=X, T=T, Nt=20, Nx=50),
-        InitialCondition(X=X, Nx=50),
-        InitialVelocity(X=X, Nx=50),
-        BoundaryConditionLeft(T=T, Nt=20),
-        BoundaryConditionRight(X=X, T=T, Nt=20),
+        Residual(Nt=10, Nx=20, T=T, X=X),
+        InitialCondition(Nx=20, X=X),
+        BoundaryConditionLeft(Nt=20, T=T),
+        BoundaryConditionRight(Nt=20, T=T, X=X),
     ]
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
@@ -95,7 +88,7 @@ def train() -> None:
         pde=pde,
         iterations=5000,
         model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=10, history_size=10, lr=1),
+        optimizer=optim.LBFGS(model.parameters(), max_iter=5, history_size=5, lr=1),
         test_every=10,
         save_path="data/best_model_pinn_pce.pickle",
         device=device,

@@ -27,7 +27,8 @@ repos:
     -   id: ruff-format
         args: [--config=pyproject.toml]
     -   id: ruff-check
-        args: [--config=pyproject.toml, --fix, --unsafe-fixes]
+        args: [--config=pyproject.toml, --fix, --unsafe-fixes, --output-format=concise, --quiet]
+
 
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.20.0

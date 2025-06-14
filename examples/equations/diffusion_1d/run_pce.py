@@ -16,7 +16,7 @@ from chaospy import J
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
-from examples.equations.heat_1d.pde import analytical_solution
+from examples.equations.diffusion_1d.pde import reference_solution
 
 
 def main() -> None:
@@ -34,7 +34,7 @@ def main() -> None:
     x = np.linspace(0, np.pi, 100)[:, None]
     t = np.linspace(0, 1, 40)[None, :]
 
-    solutions = np.array([analytical_solution(t, x, p) for p in samples.T])
+    solutions = np.array([reference_solution(t, x, p) for p in samples.T])
 
     pce_coefficients = chaospy.fit_regression(expansion, samples, solutions)
 

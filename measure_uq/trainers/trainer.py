@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Self
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 
 from measure_uq.callbacks import Callbacks
@@ -200,6 +201,12 @@ class Trainer:
 
                 self.one_train_step()
 
+                if not np.isfinite(
+                    self.trainer_data.losses_train[self.trainer_data.iteration]
+                ):
+                    print("Training loss is NaN or Inf. Exiting training loop.")
+                    break
+
                 if self.safe_stoppers.should_stop():
                     print("Stopping criteria met.")
                     break
@@ -236,6 +243,7 @@ class Trainer:
         loss = self.trainer_data.pde.loss_train_for_closure(
             self.trainer_data.model,
         )
+
         loss.backward()  # type: ignore[no-untyped-call]
 
         return loss
@@ -301,12 +309,20 @@ class Trainer:
             and self.trainer_data.iteration > 0
         ):
             self.trainer_data.model.eval()
-            loss = self.trainer_data.pde.loss_test(
+            loss: torch.Tensor = self.trainer_data.pde.loss_test(
                 self.trainer_data.model,
                 self.trainer_data.iteration,
             )
 
             self.trainer_data.losses_test[self.trainer_data.iteration] = loss.item()
+
+            if loss.item() < self.trainer_data.best_test_loss:
+                print(
+                    f"New best test loss: {loss.item():.2e}. "
+                    f"Saving model in {self.trainer_data.save_path}"
+                )
+                self.trainer_data.best_test_loss = loss.item()
+                self.trainer_data.model.save(self.trainer_data.save_path)
 
     def save(self, filename: str | Path = "trainer.pickle") -> None:
         """

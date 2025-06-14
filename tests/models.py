@@ -12,6 +12,7 @@ import torch
 from torch import tensor
 
 from measure_uq.models import PINN_PCE
+from measure_uq.networks import FeedforwardBuilder
 
 
 class MockModule(torch.nn.Module):
@@ -102,7 +103,10 @@ def test_pinn_pce() -> None:
     ).T
     expansion.__len__.return_value = Ne
 
-    model = PINN_PCE([1, 1, 1], expansion)
+    model = PINN_PCE(
+        network_builder=FeedforwardBuilder([1, 1, 1]),
+        expansion=expansion,
+    )
 
     # Set the output of each network to be equal to the input
     Nsx = 20

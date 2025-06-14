@@ -16,6 +16,7 @@ This module provides:
 
 # ruff: noqa: N801
 
+from abc import abstractmethod
 from pathlib import Path
 from typing import Self
 
@@ -23,170 +24,8 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
+from measure_uq.networks import NetworkBuilder
 from measure_uq.utilities import ArrayLike1DInt, PolyExpansion, torch_numpoly_call
-
-
-def feedforward(n: ArrayLike1DInt) -> nn.Sequential:
-    """
-    Create a feedforward NN with the given number of neurons in each layer.
-
-    The output of the last layer is the output of the network.
-
-    Parameters
-    ----------
-    n : list of int
-        List of number of neurons in each layer, including the output layer.
-
-    Returns
-    -------
-    nn.Sequential
-        The created feedforward neural network.
-    """
-    min_layers = 3
-
-    assert len(n) >= min_layers
-
-    layers = [
-        nn.Linear(n[0], n[1]),  # type: ignore [arg-type]
-        nn.Tanh(),
-    ]
-    for i in range(2, len(n) - 1):
-        layers += [
-            nn.Linear(n[i - 1], n[i]),  # type: ignore [arg-type]
-            nn.Tanh(),
-        ]
-    layers += [nn.Linear(n[-2], n[-1])]  # type: ignore [arg-type]
-
-    ff = nn.Sequential(*layers)
-
-    for layer in ff:
-        if isinstance(layer, nn.Linear):
-            nn.init.xavier_uniform_(layer.weight)
-            nn.init.zeros_(layer.bias)
-
-    return ff
-
-
-class ResidualBlock(nn.Module):
-    """
-    A residual block for neural networks.
-
-    This block implements a simple residual connection, which helps in training
-    deep networks by allowing gradients to flow through the network more easily.
-
-    Parameters
-    ----------
-    width : int
-        The number of features for the input and output of the block.
-    """
-
-    def __init__(self, width: int) -> None:
-        """
-        Initialize the ResidualBlock.
-
-        Parameters
-        ----------
-        width : int
-            The number of features for the input and output of the block.
-        """
-        super().__init__()
-        self.linear1 = nn.Linear(width, width)
-        self.norm1 = nn.LayerNorm(width)
-        self.activation = nn.Tanh()
-        self.linear2 = nn.Linear(width, width)
-        self.norm2 = nn.LayerNorm(width)
-
-        self.init_weights()
-
-    def init_weights(self) -> None:
-        """
-        Initialize the weights of the linear layers.
-
-        This method sets the weights of the linear layers to a specific
-        initialization strategy, which can help in training the network.
-        """
-        nn.init.xavier_uniform_(self.linear1.weight)
-        nn.init.zeros_(self.linear1.bias)
-
-        nn.init.xavier_uniform_(self.linear2.weight)
-        nn.init.zeros_(self.linear2.bias)
-
-        # Optional: scale the second linear layer to stabilize training
-        with torch.no_grad():
-            self.linear2.weight *= 0.1
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Forward pass through the residual block.
-
-        Parameters
-        ----------
-        x : Tensor
-            The input tensor.
-
-        Returns
-        -------
-        Tensor
-            The output tensor after applying the residual connection.
-        """
-        residual = x
-        out = self.linear1(x)
-        out = self.norm1(out)
-        out = self.activation(out)
-        out = self.linear2(out)
-        out = self.norm2(out)
-        return residual + out
-
-
-def feedforward_resnet(n: list[int]) -> nn.Sequential:
-    """
-    Construct a residual feedforward neural network with LayerNorm.
-
-    Parameters
-    ----------
-    n : list of int
-        Architecture definition. Must be of the form
-        [input_dim, width, ..., width, output_dim].
-
-    Returns
-    -------
-    nn.Sequential
-        Residual network model.
-    """
-    if len(n) < 3:
-        raise ValueError("Must have at least 3 layers: input, one hidden, output.")
-
-    input_dim = n[0]
-    output_dim = n[-1]
-    hidden_layers = n[1:-1]
-
-    # Ensure all hidden layers have the same width
-    if any(width != hidden_layers[0] for width in hidden_layers):
-        raise ValueError(
-            "All hidden layers in a residual network must have the same width.",
-        )
-
-    width = hidden_layers[0]
-    depth = len(hidden_layers)
-
-    first_layer = nn.Linear(input_dim, width)
-    nn.init.xavier_uniform_(first_layer.weight)
-    nn.init.zeros_(first_layer.bias)
-
-    layers = [
-        first_layer,
-        nn.LayerNorm(width),
-        nn.Tanh(),
-    ]
-
-    layers += [ResidualBlock(width) for _ in range(depth - 1)]
-
-    output_layer = nn.Linear(width, output_dim)
-    nn.init.xavier_uniform_(output_layer.weight)
-    nn.init.zeros_(output_layer.bias)
-    layers.append(output_layer)
-
-    return nn.Sequential(*layers)
 
 
 class ModelWithCombinedInput(nn.Module):
@@ -197,19 +36,31 @@ class ModelWithCombinedInput(nn.Module):
     input tensors with parameter tensors. It serves as a base class for more
     complex models that require combined input and parameters.
 
-    Attributes
+    Parameters
     ----------
-    None
+    network_builder : NetworkBuilder
+        The network builder.
     """
 
-    def __init__(self) -> None:
+    network_builder: NetworkBuilder
+    network: nn.Sequential
+
+    def __init__(self, network_builder: NetworkBuilder) -> None:
         """
         Initialize the ModelWithCombinedInput.
 
         This constructor sets up the base structure for models that combine
         input and parameters.
+
+        Parameters
+        ----------
+        network_builder : NetworkBuilder
+            The network builder.
         """
         super().__init__()
+
+        self.network_builder = network_builder
+        self.network = self.network_builder()
 
     def combine_input(
         self,
@@ -237,6 +88,30 @@ class ModelWithCombinedInput(nn.Module):
 
         return torch.cat([x_repeated, p_tiled], dim=1)
 
+    @abstractmethod
+    def save(self, file_path: str | Path) -> None:
+        """
+        Save the model's state and parameters to a file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file where the model will be saved.
+        """
+        raise NotImplementedError("Must implement in subclass.")
+
+    @abstractmethod
+    def load(self, file_path: str | Path) -> Self:
+        """
+        Load the model's state and parameters from a file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the file from which to load the model.
+        """
+        raise NotImplementedError("Must implement in subclass.")
+
 
 class PINN(ModelWithCombinedInput):
     """
@@ -249,36 +124,25 @@ class PINN(ModelWithCombinedInput):
 
     Parameters
     ----------
-    n : list of int
-        List of number of neurons in each layer, including the output layer.
+    network_builder : NetworkBuilder
+        The network builder.
 
     Attributes
     ----------
-    network : torch.nn.Sequential
+    network : nn.Sequential
         The neural network.
-    n : list of int
-        List of number of neurons in each layer, including the output layer.
     """
 
-    def __init__(self, n: ArrayLike1DInt) -> None:
+    def __init__(self, network_builder: NetworkBuilder) -> None:
         """
         Initialize a Physics Informed Neural Network (PINN) with n hidden layers.
 
         Parameters
         ----------
-        n : ArrayLike1DInt
-            List of number of neurons in each layer, including the output layer.
-
-        Returns
-        -------
-        None
-            This method does not return anything.
+        network_builder : NetworkBuilder
+            The network builder.
         """
-        super().__init__()
-
-        self.network = feedforward(n)
-
-        self.n = n
+        super().__init__(network_builder=network_builder)
 
     def forward(
         self,
@@ -347,10 +211,12 @@ class PINN(ModelWithCombinedInput):
         file_path : str | Path
             The path to the file where the model will be saved.
         """
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "state_dict": self.state_dict(),
-                "n": self.n,
+                "network_builder": self.network_builder,
+                "network": self.network,
             },
             file_path,
         )
@@ -371,8 +237,7 @@ class PINN(ModelWithCombinedInput):
             The loaded model instance.
         """
         checkpoint = torch.load(file_path, weights_only=False)
-        n = checkpoint["n"]
-        model = cls(n=n)
+        model = cls(network_builder=checkpoint["network_builder"])
         model.load_state_dict(checkpoint["state_dict"])
         return model
 
@@ -388,8 +253,8 @@ class PINN_PCE(ModelWithCombinedInput):
 
     Parameters
     ----------
-    n : ArrayLike1DInt
-        The architecture of the neural network.
+    network_builder : NetworkBuilder
+        The network builder.
     expansion : PolyExpansion
         The polynomial expansion used in the model.
 
@@ -413,9 +278,6 @@ class PINN_PCE(ModelWithCombinedInput):
     expansion : PolyExpansion
         The polynomial expansion used in the model.
         :no-index:
-    net : torch.nn.Module
-        The feedforward neural network.
-        :no-index:
     """
 
     coefficients: torch.Tensor
@@ -424,11 +286,10 @@ class PINN_PCE(ModelWithCombinedInput):
     n: ArrayLike1DInt
     Nx: int
     expansion: PolyExpansion
-    net: torch.nn.Module
 
     def __init__(
         self,
-        n: ArrayLike1DInt,
+        network_builder: NetworkBuilder,
         expansion: PolyExpansion,
     ) -> None:
         """
@@ -436,20 +297,20 @@ class PINN_PCE(ModelWithCombinedInput):
 
         Parameters
         ----------
-        n : ArrayLike1DInt
-            The architecture of the neural network.
+        network_builder : NetworkBuilder
+            The network builder.
         expansion : PolyExpansion
             The polynomial expansion used in the model.
         """
-        super().__init__()
+        super().__init__(network_builder=network_builder)
 
         self.np = len(expansion)
+
+        n = self.network_builder.layer_sizes
 
         assert n[-1] == self.np, (
             "Last layer must match the polynomial expansion dimension."
         )
-
-        self.n = n
 
         self.Nx = int(n[0])
 
@@ -463,8 +324,6 @@ class PINN_PCE(ModelWithCombinedInput):
             "coefficients",
             torch.tensor(np.array(expansion.coefficients), dtype=torch.float64),
         )
-
-        self.net = feedforward(n)
 
     def forward(
         self,
@@ -499,7 +358,7 @@ class PINN_PCE(ModelWithCombinedInput):
 
         z = self.combine_input(x, p)
 
-        c = self.net(z[:, 0 : self.Nx])
+        c = self.network(z[:, 0 : self.Nx])
 
         res = torch.sum(c * phi, axis=1, keepdim=True)  # type: ignore [call-overload]
 
@@ -514,10 +373,11 @@ class PINN_PCE(ModelWithCombinedInput):
         file_path : str | Path
             The path to the file where the model will be saved.
         """
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "state_dict": self.state_dict(),
-                "n": self.n,
+                "network_builder": self.network_builder,
                 "expansion": self.expansion,
             },
             file_path,
@@ -540,8 +400,9 @@ class PINN_PCE(ModelWithCombinedInput):
         """
         checkpoint = torch.load(file_path, weights_only=False)
         model = cls(
-            n=checkpoint["n"],
+            network_builder=checkpoint["network_builder"],
             expansion=checkpoint["expansion"],
         )
         model.load_state_dict(checkpoint["state_dict"])
+
         return model

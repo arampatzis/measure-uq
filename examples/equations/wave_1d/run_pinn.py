@@ -3,20 +3,18 @@ r"""
 Solution of the wave equation on the line using a PINN.
 
 .. math::
-    u_{tt} - a u_{xx} = 0, \quad (t,x) \in [0,1] \times [0,\pi]
+    u_{tt} - a u_{xx} = 0, \quad (t,x) \in [0,T] \times [0,X]
 
     u(0, x) = \sin(k x)
 
-    u_t(0, x) = 0
+    u_t(0, x) = 0, \quad x \in [0,X]
 
-    u(t, 0) = 0
+    u(t, 0) = 0, \quad t \in [0,T]
 
-    u(t, \pi) = \sin(k \pi) \cos(\sqrt{a} k t)
+    u(t, X) = \sin(k X) \cos(\sqrt{a} k t), \quad t \in [0,T]
 """
 
 import chaospy
-import click
-import matplotlib.pyplot as plt
 import numpy as np
 from chaospy import J
 from torch import optim
@@ -29,19 +27,18 @@ from examples.equations.wave_1d.pde import (
     RandomParameters,
     Residual,
 )
-from examples.equations.wave_1d.plot import plot
 from measure_uq.callbacks import (
     CallbackLog,
     Callbacks,
     ModularPlotCallback,
 )
 from measure_uq.models import PINN
+from measure_uq.networks import FeedforwardBuilder
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import (
     ConditionLossPanel,
     TrainTestLossPanel,
 )
-from measure_uq.stoppers import Stoppers, TrainingLossStopper
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
@@ -56,7 +53,10 @@ def train() -> None:
     device = "cuda:0"
 
     model = PINN(
-        [4, 64, 64, 64, 64, 64, 1],
+        network_builder=FeedforwardBuilder(
+            layer_sizes=[4, 64, 64, 64, 64, 64, 1],
+            activation="snake",
+        ),
     )
 
     T = 2.0
@@ -90,11 +90,12 @@ def train() -> None:
         model=model,
         optimizer=optim.LBFGS(
             model.parameters(),
-            max_iter=5,
-            history_size=5,
+            max_iter=20,
+            history_size=20,
             lr=1,
         ),
         test_every=10,
+        save_path="data/best_model_pinn.pickle",
         device=device,
     )
 
@@ -112,13 +113,6 @@ def train() -> None:
         ],
     )
 
-    Stoppers(
-        trainer_data=trainer_data,
-        stoppers=[
-            TrainingLossStopper(patience=50, delta=1e-5),
-        ],
-    )
-
     trainer = Trainer(
         trainer_data=trainer_data,
         callbacks=callbacks,
@@ -131,33 +125,5 @@ def train() -> None:
     trainer.save("data/trainer_pinn.pickle")
 
 
-def plot_all() -> None:
-    """Plot the solution of the PDE."""
-    fig2, ax2, anime = plot(
-        model_path="data/model_pinn.pickle",
-        pde_path="data/pde_pinn.pickle",
-        model_type=PINN,
-    )
-
-    plt.show()
-
-
-@click.command()
-@click.option("--plot", is_flag=True, help="Run the plot function instead of training.")
-def main(plot: bool) -> None:
-    """
-    Run the training or plotting.
-
-    Parameters
-    ----------
-    plot : bool
-        If True, run the plotting function.
-    """
-    if plot:
-        plot_all()
-    else:
-        train()
-
-
 if __name__ == "__main__":
-    main()
+    train()

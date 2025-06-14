@@ -526,25 +526,9 @@ class PDE:
     loss_weights_ : Tensor
         The weights for each condition's loss, initialized during post-construction.
     resample_conditions_every_ : Tensor
-        The number of iterations between resampling points for each condition,
-        initialized during post-construction.
+        The number of iterations between resampling points for each condition.
     resample_parameters_every : int
         The number of iterations between resampling parameters, default is infinity.
-
-    Methods
-    -------
-    resample_conditions(iteration: int)
-        Resample the training conditions based on the current iteration.
-    loss_train(model: ModelWithCombinedInput, iteration: int) -> Tensor
-        Compute the training loss for the given model and iteration.
-    loss_train_for_closure(model: ModelWithCombinedInput) -> Tensor
-        Compute the training loss for the given model.
-    loss_test(model: ModelWithCombinedInput, iteration: int = 0) -> Tensor
-        Compute the test loss for the given model and iteration.
-    save(filename: str | Path = "pde.pickle") -> None
-        Save the PDE to a file using pickling.
-    load(filename: str | Path) -> Self
-        Load a PDE instance from a file using pickling.
     """
 
     conditions_train: Conditions
