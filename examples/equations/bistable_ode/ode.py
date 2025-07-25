@@ -84,7 +84,7 @@ class Residual(Condition):
     Nt : int
         Number of time points.
     T : float
-        Maximum time.
+        Final time.
     residual : Tensor
         Residual of the wave equation.
     """

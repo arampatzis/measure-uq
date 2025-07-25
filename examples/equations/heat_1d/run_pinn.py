@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 r"""
-Solution of the heat equation on the line using a PINN-PCE method.
+Solution of the heat equation on the line using a PINN.
 
 .. math::
     u_t - a / k^2 u_xx = 0
@@ -14,7 +14,7 @@ import numpy as np
 from chaospy import J
 from torch import optim
 
-from examples.equations.diffusion_1d.pde import (
+from examples.equations.heat_1d.pde import (
     BoundaryConditionLeft,
     BoundaryConditionRight,
     InitialCondition,
@@ -26,38 +26,32 @@ from measure_uq.callbacks import (
     Callbacks,
     ModularPlotCallback,
 )
-from measure_uq.models import PINN_PCE
+from measure_uq.models import PINN
 from measure_uq.networks import FeedforwardBuilder
 from measure_uq.pde import PDE, Conditions
 from measure_uq.plots import (
     ConditionLossPanel,
     TrainTestLossPanel,
 )
+from measure_uq.stoppers import Stoppers, TrainingLossStopper
 from measure_uq.trainers.trainer import Trainer
 from measure_uq.trainers.trainer_data import TrainerData
 
 
 def train() -> None:
-    """Train the PINN-PCE."""
+    """Train the PINN."""
     joint = J(
         chaospy.Uniform(1, 3),
         chaospy.Uniform(1, 3),
     )
 
-    expansion = chaospy.generate_expansion(
-        5,
-        joint,
-        normed=True,
-    )
-
     device = "cuda:0"
 
-    model = PINN_PCE(
+    model = PINN(
         network_builder=FeedforwardBuilder(
-            layer_sizes=[2, 20, 20, 20, 20, 20, 20, len(expansion)],
+            layer_sizes=[4, 20, 20, 20, 20, 20, 20, 1],
             activation="snake",
         ),
-        expansion=expansion,
     ).to(device)
 
     T = 1.0
@@ -88,9 +82,14 @@ def train() -> None:
         pde=pde,
         iterations=5000,
         model=model,
-        optimizer=optim.LBFGS(model.parameters(), max_iter=5, history_size=5, lr=1),
-        test_every=10,
-        save_path="data/best_model_pinn_pce.pickle",
+        optimizer=optim.LBFGS(
+            model.parameters(),
+            max_iter=5,
+            history_size=5,
+            lr=1,
+        ),
+        test_every=40,
+        save_path="data/best_model_pinn.pickle",
         device=device,
     )
 
@@ -99,12 +98,19 @@ def train() -> None:
         callbacks=[
             CallbackLog(print_every=10),
             ModularPlotCallback(
-                plot_every=100,
+                plot_every=10,
                 panels=[
                     TrainTestLossPanel,
                     ConditionLossPanel,
                 ],
             ),
+        ],
+    )
+
+    Stoppers(
+        trainer_data=trainer_data,
+        stoppers=[
+            TrainingLossStopper(patience=50, delta=1e-5),
         ],
     )
 
@@ -115,9 +121,9 @@ def train() -> None:
 
     trainer.train()
 
-    pde.save("data/pde_pinn_pce.pickle")
-    model.save("data/model_pinn_pce.pt")
-    trainer.save("data/trainer_pinn_pce.pickle")
+    pde.save("data/pde_pinn.pickle")
+    model.save("data/model_pinn.pickle")
+    trainer.save("data/trainer_pinn.pickle")
 
 
 if __name__ == "__main__":

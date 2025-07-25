@@ -2,7 +2,8 @@
 Additional third-party code licenses used in this project:
 ------------------------------------------------------------
 
-numpy_dynamic_array by Dylan Walsh
+deepxde by Lu Lu
+
 BSD 3-Clause License
 
 Copyright (c) 2021 Dylan Walsh

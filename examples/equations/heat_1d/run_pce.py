@@ -16,7 +16,7 @@ from chaospy import J
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
-from examples.equations.diffusion_1d.pde import reference_solution
+from examples.equations.heat_1d.pde import reference_solution
 
 
 def main() -> None:

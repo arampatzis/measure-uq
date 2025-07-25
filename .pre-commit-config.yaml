@@ -47,6 +47,17 @@ repos:
     -   id: numpydoc-validation
         exclude: '^(sandbox/|^docs/)'
 
+-   repo: https://github.com/srstevenson/nb-clean
+    rev: 4.0.1
+    hooks:
+    -   id: nb-clean
+        args:
+        -   --remove-empty-cells
+        -   --preserve-cell-metadata
+        -   tags
+        -   slideshow
+        -   --
+
 -   repo: local
     hooks:
     -   id: mypy
