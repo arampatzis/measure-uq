@@ -10,8 +10,9 @@ Polynomial Chaos Expansion (PCE) to solve random partial differential equations.
 
 To install the dependencies and the project, run:
 ```bash
-poetry install
+poetry install --only main
 ```
+
 
 Either use the `shell` pluginn to open a shell with the project's environment activated:
 ```bash
