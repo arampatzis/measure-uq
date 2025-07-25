@@ -24,13 +24,25 @@ We use [pre-commit](https://pre-commit.com/) to maintain code quality.
 Please install and run the hooks before committing:
 
 ```bash
-pip install pre-commit
 pre-commit install
+pre-commit install --hook-type commit-msg
+pre-commit install --hook-type pre-commit
 ```
 
 This will automatically check your code for formatting and linting issues before each commit.
 
 Run the hooks manually by running `pre-commit run --all-files`.
+
+
+## commitlint
+
+The commit messages are being linted using the [commitlint](https://commitlint.js.org/) hook
+at the [commit-msg](https://pre-commit.com/#commit-msg) stage.
+The schema for the commit strings is taken from the
+[conventional commits](https://www.conventionalcommits.org) specification.
+The rules of this schema can be found
+[here](https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional).
+
 
 ## Issues
 - Search for existing issues before opening a new one.

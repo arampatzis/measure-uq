@@ -12,29 +12,52 @@ repos:
     rev: v5.0.0
     hooks:
     -   id: trailing-whitespace
+        stages: [pre-commit]
+
     -   id: end-of-file-fixer
+        stages: [pre-commit]
+
     -   id: check-yaml
+        stages: [pre-commit]
+
     -   id: check-toml
+        stages: [pre-commit]
+
     -   id: check-added-large-files
+        stages: [pre-commit]
+
     -   id: check-case-conflict
+        stages: [pre-commit]
+
     -   id: check-executables-have-shebangs
+        stages: [pre-commit]
+
     -   id: check-shebang-scripts-are-executable
+        stages: [pre-commit]
+
     -   id: check-merge-conflict
+        stages: [pre-commit]
 
 -   repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
     rev: v2.14.0
     hooks:
     -   id: pretty-format-yaml
+        stages: [pre-commit]
         args: [--autofix, --indent, '4', --preserve-quotes]
+
     -   id: pretty-format-toml
+        stages: [pre-commit]
         args: [--autofix]
 
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.13
     hooks:
     -   id: ruff-format
+        stages: [pre-commit]
         args: [--config=pyproject.toml]
+
     -   id: ruff-check
+        stages: [pre-commit]
         args: [--config=pyproject.toml, --fix, --unsafe-fixes, --output-format=concise, --quiet]
 
 
@@ -42,23 +65,27 @@ repos:
     rev: v3.20.0
     hooks:
     -   id: pyupgrade
+        stages: [pre-commit]
         args: [--py310-plus]
 
 -   repo: https://github.com/dannysepler/rm_unneeded_f_str
     rev: v0.2.0
     hooks:
     -   id: rm-unneeded-f-str
+        stages: [pre-commit]
 
 -   repo: https://github.com/numpy/numpydoc
     rev: v1.8.0
     hooks:
     -   id: numpydoc-validation
+        stages: [pre-commit]
         exclude: '^(sandbox/|^docs/)'
 
 -   repo: https://github.com/srstevenson/nb-clean
     rev: 4.0.1
     hooks:
     -   id: nb-clean
+        stages: [pre-commit]
         args:
         -   --remove-empty-cells
         -   --preserve-cell-metadata
@@ -69,6 +96,7 @@ repos:
 -   repo: local
     hooks:
     -   id: mypy
+        stages: [pre-commit]
         name: mypy
         entry: mypy
         args: [--show-error-codes, --explicit-package-bases, --config-file=pyproject.toml]
