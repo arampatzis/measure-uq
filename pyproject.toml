@@ -2,18 +2,16 @@
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
 
-[project]
-authors = [
-  {name = "G. Arampatzis", email = "georgios.arampatzis@uoc.gr"}
-]
-description = "Measure UQ"
+[tool.poetry]
 name = "measure-uq"
+version = "0.1.1"
+description = "Measure UQ"
+authors = ["G. Arampatzis <georgios.arampatzis@uoc.gr>"]
+readme = "README.md"
 packages = [
   {include = "measure_uq"},
   {include = "examples"}
 ]
-readme = "README.md"
-version = "0.1.1"
 
 [tool.mypy]
 disallow_incomplete_defs = true
@@ -70,6 +68,8 @@ torch = [
   {version = "^2.6.0", platform = "linux"}
 ]
 wandb = "^0.18.3"
+ipykernel = "^6.30.0"
+notebook = "^7.4.4"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"

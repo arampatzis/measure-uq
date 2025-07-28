@@ -47,7 +47,7 @@ $\gamma$.
 
 The initial and boundary conditions are given by
 $$
-\mathcal{C}_{\xi, i} u(z, \xi) = g_i(z, \xi), \quad z \in C_i \subset C, \quad \xi \in \Xi \,,
+\mathcal{C}_{\xi, i} u(z, \xi) = g_i(z, \xi), \quad z \in C_i \subset C, \quad \xi \in \Xi \
 $$
 
 for $i = 1, \ldots, m$.
