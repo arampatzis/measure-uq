@@ -1,0 +1,1 @@
+"""1D Schrödinger equation example."""

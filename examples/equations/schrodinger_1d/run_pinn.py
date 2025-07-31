@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 r"""
-Solution of the heat equation on the line using a PINN.
+Solution of the 1D time-dependent Schrödinger equation using a PINN.
 
 .. math::
-    u_t - a / k^2 u_xx = 0
-    u(0, x) = \sin(k x)
-    u(t, 0) = 0
-    u(t, \pi) = exp(-a t) \sin(\pi k)
+    i\hbar \frac{\partial \psi}{\partial t} = -\frac{\hbar^2}{2m} \frac{\partial^2 \psi}{\partial x^2} + V(x) \psi
+    \psi(0, x) = \psi_0(x)
+    \psi(t, x_{min}) = 0
+    \psi(t, x_{max}) = 0
+
+Where:
+- \psi(t, x) is the complex wave function
+- \hbar is the reduced Planck constant
+- m is the particle mass
+- V(x) is the potential energy function
+- \psi_0(x) is the initial wave function
 """
 
 import chaospy
@@ -14,7 +21,7 @@ import numpy as np
 from chaospy import J
 from torch import optim
 
-from examples.equations.heat_1d.pde import (
+from examples.equations.schrodinger_1d.pde import (
     BoundaryConditionLeft,
     BoundaryConditionRight,
     InitialCondition,
@@ -39,36 +46,47 @@ from measure_uq.trainers.trainer_data import TrainerData
 
 
 def train() -> None:
-    """Train the PINN."""
+    """Train the PINN for the 1D Schrödinger equation."""
+    # Define joint distribution for parameters
+    # Parameters: hbar, m, k0, sigma
     joint = J(
-        chaospy.Uniform(1, 3),
-        chaospy.Uniform(1, 3),
+        chaospy.Normal(1.0, 0.1),    # hbar (reduced Planck constant)
+        chaospy.Normal(1.0, 0.1),    # m (particle mass)
+        chaospy.Uniform(3.0, 5.0),   # k0 (initial wave number)
+        chaospy.Uniform(0.5, 1.0),   # sigma (width of the Gaussian wave packet)
     )
 
-    device = "cpu"   # "cuda:0"
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+    # Define the neural network model
+    # Note: Output size is 2 for real and imaginary parts
     model = PINN(
         network_builder=FeedforwardBuilder(
-            layer_sizes=[4, 20, 20, 20, 20, 20, 20, 1],
-            activation="snake",
+            layer_sizes=[6, 50, 50, 50, 50, 50, 2],
+            activation="tanh",
         ),
     ).to(device)
 
-    T = 1.0
-    X = np.pi
+    # Define domain parameters
+    T = 2.0         # Maximum time
+    X_min = -10.0   # Minimum spatial coordinate
+    X_max = 10.0    # Maximum spatial coordinate
 
+    # Define conditions
     conditions = [
-        Residual(Nt=10, Nx=20, T=T, X=X),
-        InitialCondition(Nx=20, X=X),
-        BoundaryConditionLeft(Nt=20, T=T),
-        BoundaryConditionRight(Nt=20, T=T, X=X),
+        Residual(Nt=20, Nx=40, T=T, X_min=X_min, X_max=X_max),
+        InitialCondition(Nx=40, X_min=X_min, X_max=X_max),
+        BoundaryConditionLeft(Nt=20, T=T, X_min=X_min),
+        BoundaryConditionRight(Nt=20, T=T, X_max=X_max),
     ]
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
 
+    # Define parameters
     parameters_train = RandomParameters(device=device, joint=joint, N=40)
     parameters_test = RandomParameters(device=device, joint=joint, N=40)
 
+    # Define PDE
     pde = PDE(
         conditions_train=conditions_train,
         conditions_test=conditions_test,
@@ -78,6 +96,11 @@ def train() -> None:
         resample_parameters_every=100,
     )
 
+    # Create directories for saving results if they don't exist
+    import os
+    os.makedirs("data", exist_ok=True)
+
+    # Define trainer data
     trainer_data = TrainerData(
         pde=pde,
         iterations=5000,
@@ -89,10 +112,11 @@ def train() -> None:
             lr=1,
         ),
         test_every=40,
-        save_path="data/best_model_pinn.pickle",
+        save_path="data/best_model_schrodinger_pinn.pickle",
         device=device,
     )
 
+    # Define callbacks
     callbacks = Callbacks(
         trainer_data=trainer_data,
         callbacks=[
@@ -107,6 +131,7 @@ def train() -> None:
         ],
     )
 
+    # Define stoppers
     Stoppers(
         trainer_data=trainer_data,
         stoppers=[
@@ -114,6 +139,7 @@ def train() -> None:
         ],
     )
 
+    # Create and run trainer
     trainer = Trainer(
         trainer_data=trainer_data,
         callbacks=callbacks,
@@ -121,10 +147,12 @@ def train() -> None:
 
     trainer.train()
 
-    pde.save("data/pde_pinn.pickle")
-    model.save("data/model_pinn.pickle")
-    trainer.save("data/trainer_pinn.pickle")
+    # Save results
+    pde.save("data/pde_schrodinger_pinn.pickle")
+    model.save("data/model_schrodinger_pinn.pickle")
+    trainer.save("data/trainer_schrodinger_pinn.pickle")
 
 
 if __name__ == "__main__":
+    import torch
     train()
