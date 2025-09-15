@@ -1,30 +1,29 @@
-# Minimal makefile for Sphinx documentation
+# Makefile for building Sphinx documentation
 
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = source
-BUILDDIR      = build
-FLAGS         = -f -e -P
+# Variables
+SPHINXBUILD  = sphinx-build
+SOURCEDIR    = source
+BUILDDIR     = build
+APIDOCFLAGS  = -f -e -P
 
-.PHONY: help html-all Makefile
+.PHONY: help html html-all clean
 
-# Default help target
+# Show help message
 help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)"
 
-# Custom target: Generate .rst from code and build HTML docs
+# Build only existing HTML docs (assumes .rst files are up to date)
+html:
+	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)"
+
+# Regenerate .rst files from code, then build HTML
 html-all:
-	sphinx-apidoc $(FLAGS) -o $(SOURCEDIR)/measure_uq ../measure_uq/ \
-		../measure_uq/gradients/gradients.py \
-		../measure_uq/gradients/jacobian.py
-	sphinx-apidoc $(FLAGS) -o $(SOURCEDIR)/examples ../examples/
-	$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	sphinx-apidoc $(APIDOCFLAGS) -o $(SOURCEDIR)/measure_uq ../measure_uq/
+	sphinx-apidoc $(APIDOCFLAGS) -o $(SOURCEDIR)/examples ../examples/
+	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)"
 
+# Remove generated files
 clean:
-	rm -rf $(BUILDDIR)/
-	rm -rf $(SOURCEDIR)/examples/
-	rm -rf $(SOURCEDIR)/measure_uq/
-
-# Catch-all: route unknown targets to sphinx-build
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	rm -rf "$(BUILDDIR)" \
+	       "$(SOURCEDIR)/examples" \
+	       "$(SOURCEDIR)/measure_uq"
