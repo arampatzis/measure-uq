@@ -48,7 +48,6 @@ def train() -> None:
     model = PINN(
         network_builder=FeedforwardBuilder(
             layer_sizes=[3, 32, 32, 32, 32, 32, 1],
-            #layer_sizes=[3, 32, 32, 32, 32, 32,32, 32, 32, 32, 32, 1],
             activation="snake",
         ),
     )
@@ -165,7 +164,7 @@ if __name__ == "__main__":
 #         model=model,
 #         optimizer=optim.LBFGS(
 #             model.parameters(),
-#             max_iter=10,
+#             max_iter=20,
 #             history_size=20,
 #             lr=1,
 #             line_search_fn="strong_wolfe",
