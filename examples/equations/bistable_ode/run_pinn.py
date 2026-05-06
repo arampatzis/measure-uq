@@ -61,8 +61,8 @@ def train() -> None:
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
 
-    parameters_train = RandomParameters(device=device, joint=joint, N=2*50)
-    parameters_test = RandomParameters(device=device, joint=joint, N=2*50)
+    parameters_train = RandomParameters(device=device, joint=joint, N=100)
+    parameters_test = RandomParameters(device=device, joint=joint, N=100)
 
     pde = PDE(
         conditions_train=conditions_train,
