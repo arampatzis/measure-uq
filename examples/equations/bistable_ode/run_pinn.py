@@ -55,14 +55,14 @@ def train() -> None:
     T = 8.0
 
     conditions = [
-        Residual(T=T, Nt=100),
+        Residual(T=T, Nt=200),
         InitialCondition(),
     ]
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
 
-    parameters_train = RandomParameters(device=device, joint=joint, N=50)
-    parameters_test = RandomParameters(device=device, joint=joint, N=50)
+    parameters_train = RandomParameters(device=device, joint=joint, N=2*50)
+    parameters_test = RandomParameters(device=device, joint=joint, N=2*50)
 
     pde = PDE(
         conditions_train=conditions_train,
