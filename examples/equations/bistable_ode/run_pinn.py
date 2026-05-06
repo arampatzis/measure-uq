@@ -6,7 +6,7 @@ This script simulates the bistable ODE:
 
 .. math::
 
-    \frac{dy}{dt} = r (y - 1) (2 - y) (y - 3), \quad y(0) = y_0
+    jacobian
 
 where :math:`r \sim \mathcal{U}(0.8, 1.2)` and :math:`y_0 \sim \mathcal{U}(0, 4)`.
 """
@@ -43,11 +43,12 @@ def train() -> None:
         chaospy.Uniform(0.8, 1.2),
     )
 
-    device = "cuda:0"
+    device = "mps:0"
 
     model = PINN(
         network_builder=FeedforwardBuilder(
             layer_sizes=[3, 32, 32, 32, 32, 32, 1],
+            #layer_sizes=[3, 32, 32, 32, 32, 32,32, 32, 32, 32, 32, 1],
             activation="snake",
         ),
     )
@@ -75,13 +76,14 @@ def train() -> None:
 
     trainer_data = TrainerData(
         pde=pde,
-        iterations=1000,
+        iterations=750,
         model=model,
         optimizer=optim.LBFGS(
             model.parameters(),
             max_iter=20,
             history_size=20,
             lr=1,
+            line_search_fn="strong_wolfe",
         ),
         test_every=10,
         device=device,
@@ -116,3 +118,88 @@ def train() -> None:
 
 if __name__ == "__main__":
     train()
+
+    # ------------------------------------------------------------
+    # Phase 1: Adam pretraining
+    # ------------------------------------------------------------
+    # trainer_data = TrainerData(
+    #     pde=pde,
+    #     iterations=1000,
+    #     model=model,
+    #     optimizer=optim.Adam(
+    #         model.parameters(),
+    #         lr=1e-3,
+    #     ),
+    #     test_every=10,
+    #     device=device,
+    #     save_path="data/best_model_pinn_adam.pickle",
+    # )
+    #
+    # callbacks = Callbacks(
+    #     trainer_data=trainer_data,
+    #     callbacks=[
+    #         CallbackLog(print_every=10),
+    #         ModularPlotCallback(
+    #             plot_every=10,
+    #             panels=[
+    #                 TrainTestLossPanel,
+    #                 ConditionLossPanel,
+    #             ],
+    #         ),
+    #     ],
+    # )
+    #
+    # trainer = Trainer(
+    #     trainer_data=trainer_data,
+    #     callbacks=callbacks,
+    # )
+    #
+    # trainer.train()
+#
+#     # ------------------------------------------------------------
+#     # Phase 2: LBFGS refinement, starting from Adam-trained model
+#     # ------------------------------------------------------------
+#     trainer_data = TrainerData(
+#         pde=pde,
+#         iterations=750,
+#         model=model,
+#         optimizer=optim.LBFGS(
+#             model.parameters(),
+#             max_iter=10,
+#             history_size=20,
+#             lr=1,
+#             line_search_fn="strong_wolfe",
+#         ),
+#         test_every=10,
+#         device=device,
+#         save_path="data/best_model_pinn.pickle",
+#     )
+#
+#     callbacks = Callbacks(
+#         trainer_data=trainer_data,
+#         callbacks=[
+#             CallbackLog(print_every=10),
+#             ModularPlotCallback(
+#                 plot_every=10,
+#                 panels=[
+#                     TrainTestLossPanel,
+#                     ConditionLossPanel,
+#                 ],
+#             ),
+#         ],
+#     )
+#
+#     trainer = Trainer(
+#         trainer_data=trainer_data,
+#         callbacks=callbacks,
+#     )
+#
+#     trainer.train()
+#
+#     pde.save("data/pde_pinn.pickle")
+#     model.save("data/model_pinn.pickle")
+#     trainer.save("data/trainer_pinn.pickle")
+#
+#
+# if __name__ == "__main__":
+#     train()

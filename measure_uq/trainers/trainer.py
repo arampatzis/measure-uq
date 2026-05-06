@@ -127,27 +127,75 @@ class Trainer:
         assert self.stoppers is not None
         return self.stoppers
 
+    # def one_train_step(self) -> None:
+    #     """
+    #     Perform a single training step.
+    #
+    #     This method executes one iteration of the training loop, which includes:
+    #     - Triggering the beginning of iteration callbacks.
+    #     - Resampling conditions for the PDE based on the current iteration.
+    #     - Performing an optimization step using the defined optimizer.
+    #     - Testing the model on the training data.
+    #     - Updating the learning rate scheduler.
+    #     - Testing the model on the test data.
+    #     - Triggering the end of iteration callbacks.
+    #
+    #     Notes
+    #     -----
+    #     The method assumes that the optimizer has a `step` method that accepts a
+    #     closure.
+    #     """
+    #     self.safe_callbacks.on_iteration_begin()
+    #
+    #     self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
+    #
+    #     self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
+    #
+    #     self.test_on_train()
+    #     self.step_scheduler()
+    #     self.test_on_test()
+    #
+    #     self.safe_callbacks.on_iteration_end()
+
     def one_train_step(self) -> None:
-        """
-        Perform a single training step.
-
-        This method executes one iteration of the training loop, which includes:
-        - Triggering the beginning of iteration callbacks.
-        - Resampling conditions for the PDE based on the current iteration.
-        - Performing an optimization step using the defined optimizer.
-        - Testing the model on the training data.
-        - Updating the learning rate scheduler.
-        - Testing the model on the test data.
-        - Triggering the end of iteration callbacks.
-
-        Notes
-        -----
-        The method assumes that the optimizer has a `step` method that accepts a
-        closure.
-        """
         self.safe_callbacks.on_iteration_begin()
 
-        self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
+        iteration = self.trainer_data.iteration
+        pde = self.trainer_data.pde
+
+        should_reset_lbfgs = False
+
+        if iteration > 0:
+            if (
+                    pde.resample_parameters_every is not None
+                    and iteration % pde.resample_parameters_every == 0
+            ):
+                should_reset_lbfgs = True
+
+            if hasattr(pde, "resample_conditions_every_"):
+                for k in pde.resample_conditions_every_:
+                    k = int(k.item()) if hasattr(k, "item") else int(k)
+                    if iteration % k == 0:
+                        should_reset_lbfgs = True
+                        break
+
+        if should_reset_lbfgs and isinstance(self.trainer_data.optimizer, torch.optim.LBFGS):
+            print(f"Resetting LBFGS optimizer at iteration {iteration}")
+            old_optimizer = self.trainer_data.optimizer
+            group = old_optimizer.param_groups[0]
+
+            self.trainer_data.optimizer = torch.optim.LBFGS(
+                group["params"],
+                lr=group["lr"],
+                max_iter=old_optimizer.defaults["max_iter"],
+                max_eval=old_optimizer.defaults["max_eval"],
+                tolerance_grad=old_optimizer.defaults["tolerance_grad"],
+                tolerance_change=old_optimizer.defaults["tolerance_change"],
+                history_size=old_optimizer.defaults["history_size"],
+                line_search_fn=old_optimizer.defaults["line_search_fn"],
+            )
+
+        self.trainer_data.pde.resample_conditions(iteration)
 
         self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
 
@@ -156,7 +204,6 @@ class Trainer:
         self.test_on_test()
 
         self.safe_callbacks.on_iteration_end()
-
     def train(self) -> None:
         """
         Train the model using the specified training loop.
