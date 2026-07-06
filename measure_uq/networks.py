@@ -226,7 +226,6 @@ class FeedforwardBuilder(NetworkBuilder):
         for layer in model:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
-                # nn.init.zeros_(layer.bias)
         return model
 
 

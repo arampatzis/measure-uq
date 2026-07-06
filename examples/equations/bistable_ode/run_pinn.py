@@ -55,14 +55,14 @@ def train() -> None:
     T = 8.0
 
     conditions = [
-        Residual(T=T, Nt=100),
+        Residual(T=T, Nt=300),
         InitialCondition(),
     ]
     conditions_train = Conditions(device=device, conditions=conditions)
     conditions_test = Conditions(device=device, conditions=conditions)
 
-    parameters_train = RandomParameters(device=device, joint=joint, N=50)
-    parameters_test = RandomParameters(device=device, joint=joint, N=50)
+    parameters_train = RandomParameters(device=device, joint=joint, N=300)
+    parameters_test = RandomParameters(device=device, joint=joint, N=300)
 
     pde = PDE(
         conditions_train=conditions_train,
@@ -75,15 +75,15 @@ def train() -> None:
 
     trainer_data = TrainerData(
         pde=pde,
-        iterations=1000,
+        iterations=750,
         model=model,
-        # optimizer=optim.LBFGS(
-        #     model.parameters(),
-        #     max_iter=20,
-        #     history_size=20,
-        #     lr=1,
-        # ),
-        optimizer=optim.Adam(model.parameters(), lr=0.01),
+        optimizer=optim.LBFGS(
+            model.parameters(),
+            max_iter=20,
+            history_size=20,
+            lr=1,
+            line_search_fn="strong_wolfe",
+        ),
         test_every=10,
         device=device,
         save_path="data/best_model_pinn.pickle",

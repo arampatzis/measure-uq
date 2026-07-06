@@ -9,25 +9,9 @@ authors = [
 description = ""
 dynamic = ["dependencies"]
 name = "measure-uq"
-requires-python = ">=3.11,<4.0"
 readme = "README.md"
+requires-python = ">=3.11,<4.0"
 version = "0.1.0"
-
-[tool.pyright]
-# Use the Poetry in-project venv so Pylance/Pyright resolves third-party imports (e.g. chaospy).
-venvPath = "."
-venv = ".venv"
-
-[tool.poetry]
-packages = [
-  { include = "measure_uq" },
-  { include = "examples" }
-]
-
-[[tool.poetry.source]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cu128"
-priority = "explicit"
 
 [tool.mypy]
 disallow_incomplete_defs = true
@@ -67,7 +51,14 @@ override_SS05 = [
   '^Access '
 ]
 
+[tool.poetry]
+packages = [
+  {include = "measure_uq"},
+  {include = "examples"}
+]
+
 [tool.poetry.dependencies]
+arviz = "^1.1.0"
 chaospy = "^4.3.17"
 clearml = "^1.16.4"
 click = "^8.1.8"
@@ -85,16 +76,17 @@ torch = [
   {version = "^2.7.1", source = "pytorch", platform = "linux"}
 ]
 wandb = "^0.18.3"
-arviz = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"
+ipykernel = "^7.2.0"
+jupyter = "^1.1.1"
 mypy = "^1.11.2"
+notebook = "^7.5.6"
 pre-commit = "^4.0.0"
 pretty-errors = "^1.2.25"
 pydocstyle = "^6.3.0"
 ruff = "^0.11.4"
-ipykernel = "^7.2.0"
 
 [tool.poetry.group.doc.dependencies]
 numpydoc = "^1.8.0"
@@ -104,10 +96,18 @@ sphinx-rtd-theme = "^3.0.2"
 [tool.poetry.group.test.dependencies]
 pytest = "^8.4.1"
 
+[[tool.poetry.source]]
+name = "pytorch"
+priority = "explicit"
+url = "https://download.pytorch.org/whl/cu128"
+
+[tool.pyright]
+venv = ".venv"
+# Use the Poetry in-project venv so Pylance/Pyright resolves third-party imports (e.g. chaospy).
+venvPath = "."
+
 [tool.ruff]
 exclude = ["sandbox", "docs"]
-line-length = 88
-target-version = "py310"
 ignore = [
   # pylint
   "PLR0913",
@@ -146,13 +146,16 @@ ignore = [
   "N803",
   "SLF001"
 ]
+line-length = 88
 select = ["ALL"]
+target-version = "py310"
 
 [tool.ruff.flake8-quotes]
 inline-quotes = "double"
 
 [tool.ruff.per-file-ignores]
 "examples/equations/bistable_ode/plot.ipynb" = ["ERA001"]
+"examples/equations/bistable_ode/plot_mytest.ipynb" = ["ERA001", "E402"]
 "examples/equations/diffusion_1d/plot.ipynb" = ["ERA001"]
 "examples/equations/reaction_diffusion_1d/plot_for_paper.ipynb" = ["ERA001", "D103", "RUF003", "E501"]
 "examples/equations/wave_1d/plot.ipynb" = ["ERA001", "D103", "RUF003", "E501"]

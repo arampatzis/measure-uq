@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -137,6 +136,7 @@ class Trainer:
 
         This method executes one iteration of the training loop, which includes:
         - Triggering the beginning of iteration callbacks.
+        - Resetting the LBFGS optimizer if a resample boundary was crossed.
         - Resampling conditions for the PDE based on the current iteration.
         - Performing an optimization step using the defined optimizer.
         - Testing the model on the training data.
@@ -151,7 +151,48 @@ class Trainer:
         """
         self.safe_callbacks.on_iteration_begin()
 
-        self.trainer_data.pde.resample_conditions(self.trainer_data.iteration)
+        iteration = self.trainer_data.iteration
+        pde = self.trainer_data.pde
+
+        should_reset_lbfgs = False
+
+        if iteration > 0:
+            if (
+                pde.resample_parameters_every is not None
+                and iteration % pde.resample_parameters_every == 0
+            ):
+                should_reset_lbfgs = True
+
+            if hasattr(pde, "resample_conditions_every_"):
+                for raw_period in pde.resample_conditions_every_:
+                    period = (
+                        int(raw_period.item())
+                        if hasattr(raw_period, "item")
+                        else int(raw_period)
+                    )
+                    if iteration % period == 0:
+                        should_reset_lbfgs = True
+                        break
+
+        if should_reset_lbfgs and isinstance(
+            self.trainer_data.optimizer, torch.optim.LBFGS
+        ):
+            print(f"Resetting LBFGS optimizer at iteration {iteration}")
+            old_optimizer = self.trainer_data.optimizer
+            group = old_optimizer.param_groups[0]
+
+            self.trainer_data.optimizer = torch.optim.LBFGS(
+                group["params"],
+                lr=group["lr"],
+                max_iter=old_optimizer.defaults["max_iter"],
+                max_eval=old_optimizer.defaults["max_eval"],
+                tolerance_grad=old_optimizer.defaults["tolerance_grad"],
+                tolerance_change=old_optimizer.defaults["tolerance_change"],
+                history_size=old_optimizer.defaults["history_size"],
+                line_search_fn=old_optimizer.defaults["line_search_fn"],
+            )
+
+        self.trainer_data.pde.resample_conditions(iteration)
 
         self.trainer_data.optimizer.step(self.closure)  # type: ignore[arg-type]
 

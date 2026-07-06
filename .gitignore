@@ -1,7 +1,9 @@
 .venv/
 .vscode/
+.idea/
 __pycache__/
 temp/
+**/.ipynb_checkpoints/
 
 .DS_Store
 

@@ -371,7 +371,9 @@ class ModularPlotCallback(Callback):
             from IPython import get_ipython
 
             shell = get_ipython()
-            return shell is not None and shell.__class__.__name__ == "ZMQInteractiveShell"
+            return (
+                shell is not None and shell.__class__.__name__ == "ZMQInteractiveShell"
+            )
         except ImportError:
             return False
 
