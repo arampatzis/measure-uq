@@ -20,9 +20,9 @@ This module provides:
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import matplotlib as mpl
 import numpy as np
 import torch
-from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.ticker import LogFormatterMathtext
 from numpy.typing import ArrayLike
@@ -388,7 +388,7 @@ class ConditionLossPanel(BasePlotPanel):
         self.ax.set_title("Train Losses per Condition")
         self.ax.set_xlabel("Iteration")
         self.ax.set_ylabel("Loss")
-        cmap = cm.get_cmap("Set1")
+        cmap = mpl.colormaps["Set1"]
         self.ax.set_prop_cycle(color=cmap(np.linspace(0, 1, 10)))
         set_log_scale_with_latex(self.ax, axis="y")
         self.ax.grid(True)

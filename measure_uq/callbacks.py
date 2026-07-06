@@ -16,6 +16,7 @@ Original source: https://github.com/lululxvi/deepxde
 from dataclasses import dataclass
 from tkinter import TclError
 
+import torch
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 
@@ -456,19 +457,39 @@ class ModularPlotCallback(Callback):
 
 @dataclass(kw_only=True)
 class LBFGSResetOnResample(Callback):
-    """Reset the LBFGS curvature history before each resample step.
+    """
+    Reset the LBFGS curvature history whenever the PDE resamples.
 
-    Parameters
-    ----------
-    resample_every : int
-        Must match the resample_parameters_every / resample_conditions_every
-        value used in the PDE.
+    LBFGS builds up an approximation of the inverse Hessian from gradients
+    observed on the training data. When the PDE resamples its conditions or
+    parameters, that history describes data that no longer exists, which can
+    derail training. This callback watches the same cadences the PDE itself
+    resamples on (``resample_parameters_every`` and
+    ``resample_conditions_every_``) and clears the optimizer's curvature
+    history right before a resample takes effect, so no separate period has
+    to be kept in sync by hand.
     """
 
-    resample_every: int
-
     def on_iteration_begin(self, trainer_data: TrainerData) -> None:
-        """Clear optimizer state when a resample is about to occur."""
-        i = trainer_data.iteration
-        if i > 0 and i % self.resample_every == 0:
-            trainer_data.optimizer.state.clear()
+        """
+        Clear LBFGS state when a resample is about to occur.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data containing the data of the trainer.
+        """
+        optimizer = trainer_data.optimizer
+        if not isinstance(optimizer, torch.optim.LBFGS):
+            return
+
+        iteration = trainer_data.iteration
+        if iteration == 0:
+            return
+
+        pde = trainer_data.pde
+        should_reset = iteration % pde.resample_parameters_every == 0 or any(
+            iteration % int(period) == 0 for period in pde.resample_conditions_every_
+        )
+        if should_reset:
+            optimizer.state.clear()
