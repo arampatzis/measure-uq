@@ -715,14 +715,26 @@ class PDE:
         """
         Save the PDE to a file using pickling.
 
+        The file is written atomically: data is first written to a temporary file
+        in the same directory and then renamed to the target path. This guarantees
+        that the target is either the previous complete file or the new complete
+        file — never a partial write.
+
         Parameters
         ----------
         filename : str | Path
             The name of the file to save the PDE to, by default "pde.pickle".
         """
-        Path(filename).parent.mkdir(parents=True, exist_ok=True)
-        with open(filename, "wb") as f:
-            pickle.dump(self, f)
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        tmp = filename.parent / (filename.name + ".tmp")
+        try:
+            with open(tmp, "wb") as f:
+                pickle.dump(self, f)
+            tmp.replace(filename)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     @classmethod
     def load(cls, filename: str | Path) -> Self:

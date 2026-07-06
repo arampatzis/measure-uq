@@ -70,6 +70,8 @@ class TrainerData:
 
     test_every: int = 100
 
+    l2_regularization: float = 0.0
+
     device: DeviceLikeType = "cpu"
 
     iteration: int = field(init=False, repr=True, default=0)

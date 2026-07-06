@@ -206,20 +206,32 @@ class PINN(ModelWithCombinedInput):
         """
         Save the model's state and parameters to a file.
 
+        The file is written atomically: data is first written to a temporary file
+        in the same directory and then renamed to the target path. This guarantees
+        that the target is either the previous complete file or the new complete
+        file — never a partial write.
+
         Parameters
         ----------
         file_path : str | Path
             The path to the file where the model will be saved.
         """
-        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "state_dict": self.state_dict(),
-                "network_builder": self.network_builder,
-                "network": self.network,
-            },
-            file_path,
-        )
+        file_path = Path(file_path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = file_path.parent / (file_path.name + ".tmp")
+        try:
+            torch.save(
+                {
+                    "state_dict": self.state_dict(),
+                    "network_builder": self.network_builder,
+                    "network": self.network,
+                },
+                tmp,
+            )
+            tmp.replace(file_path)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     @classmethod
     def load(cls, file_path: str | Path) -> Self:
@@ -368,20 +380,32 @@ class PINN_PCE(ModelWithCombinedInput):
         """
         Save the model's state and parameters to a file.
 
+        The file is written atomically: data is first written to a temporary file
+        in the same directory and then renamed to the target path. This guarantees
+        that the target is either the previous complete file or the new complete
+        file — never a partial write.
+
         Parameters
         ----------
         file_path : str | Path
             The path to the file where the model will be saved.
         """
-        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "state_dict": self.state_dict(),
-                "network_builder": self.network_builder,
-                "expansion": self.expansion,
-            },
-            file_path,
-        )
+        file_path = Path(file_path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = file_path.parent / (file_path.name + ".tmp")
+        try:
+            torch.save(
+                {
+                    "state_dict": self.state_dict(),
+                    "network_builder": self.network_builder,
+                    "expansion": self.expansion,
+                },
+                tmp,
+            )
+            tmp.replace(file_path)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     @classmethod
     def load(cls, file_path: str | Path) -> Self:

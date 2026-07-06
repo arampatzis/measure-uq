@@ -64,6 +64,10 @@ class Trainer:
 
     stoppers: Stoppers | None = None
 
+    pde_save_path: str | Path | None = None
+
+    trainer_save_path: str | Path | None = None
+
     def __post_init__(self) -> None:
         """
         Initialize the trainer after construction.
@@ -217,10 +221,12 @@ class Trainer:
             controller.close()
             self.safe_callbacks.on_train_end()
 
-            if plt.get_fignums():
-                plt.close("all")
+            if self.pde_save_path is not None:
+                self.trainer_data.pde.save(self.pde_save_path)
+            if self.trainer_save_path is not None:
+                self.save(self.trainer_save_path)
 
-            print("Training finished and cleaned up.")
+            print("Training finished.")
 
     def closure(self) -> torch.Tensor:
         """
@@ -243,6 +249,10 @@ class Trainer:
         loss = self.trainer_data.pde.loss_train_for_closure(
             self.trainer_data.model,
         )
+
+        if self.trainer_data.l2_regularization > 0.0:
+            l2 = sum(p.pow(2).sum() for p in self.trainer_data.model.parameters())
+            loss = loss + self.trainer_data.l2_regularization * l2
 
         loss.backward()  # type: ignore[no-untyped-call]
 
@@ -328,14 +338,26 @@ class Trainer:
         """
         Save the trainer to a file using pickling.
 
+        The file is written atomically: data is first written to a temporary file
+        in the same directory and then renamed to the target path. This guarantees
+        that the target is either the previous complete file or the new complete
+        file — never a partial write.
+
         Parameters
         ----------
         filename : str | Path
             The name of the file to save the trainer to, by default "trainer.pickle".
         """
-        Path(filename).parent.mkdir(parents=True, exist_ok=True)
-        with open(filename, "wb") as f:
-            pickle.dump(self, f)
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        tmp = filename.parent / (filename.name + ".tmp")
+        try:
+            with open(tmp, "wb") as f:
+                pickle.dump(self, f)
+            tmp.replace(filename)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     @classmethod
     def load(cls, filename: str | Path) -> Self:

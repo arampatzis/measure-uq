@@ -7,26 +7,42 @@ authors = [
   {name = "G. Arampatzis", email = "georgios.arampatzis@uoc.gr"}
 ]
 description = ""
+dynamic = ["dependencies"]
 name = "measure-uq"
-packages = [
-  {include = "measure_uq"},
-  {include = "examples"}
-]
+requires-python = ">=3.11,<4.0"
 readme = "README.md"
 version = "0.1.0"
+
+[tool.pyright]
+# Use the Poetry in-project venv so Pylance/Pyright resolves third-party imports (e.g. chaospy).
+venvPath = "."
+venv = ".venv"
+
+[tool.poetry]
+packages = [
+  { include = "measure_uq" },
+  { include = "examples" }
+]
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
 
 [tool.mypy]
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 exclude = "(sandbox|docs)(/|\\|$)"
-python_version = "3.11"
+python_version = "3.12"
 
 [[tool.mypy.overrides]]
 disable_error_code = ["name-defined"]
 ignore_missing_imports = true
 module = [
   "chaospy",
+  "corner",
+  "emcee",
   "scipy.integrate",
   "numpoly",
   "sympy",
@@ -55,21 +71,21 @@ override_SS05 = [
 chaospy = "^4.3.17"
 clearml = "^1.16.4"
 click = "^8.1.8"
-ipympl = "^0.9.7"
+corner = "^2.2"
+emcee = "^3.1"
+ipympl = "^0.10.0"
 matplotlib = "^3.9.2"
-numpy = [
-  {version = "1.26.4", platform = "darwin"},
-  {version = "^2.2.4", platform = "linux"}
-]
-python = "^3.11"
+numpy = ">=2"
+python = "^3.12"
 python-box = "^7.2.0"
 seaborn = "^0.13.2"
-sympy = "1.13.1"
+sympy = ">=1.13.3"
 torch = [
-  {version = "2.2.2", platform = "darwin"},
-  {version = "^2.6.0", platform = "linux"}
+  {version = "^2.3", platform = "darwin"},
+  {version = "^2.7.1", source = "pytorch", platform = "linux"}
 ]
 wandb = "^0.18.3"
+arviz = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 bpython = "^0.24"
@@ -78,6 +94,7 @@ pre-commit = "^4.0.0"
 pretty-errors = "^1.2.25"
 pydocstyle = "^6.3.0"
 ruff = "^0.11.4"
+ipykernel = "^7.2.0"
 
 [tool.poetry.group.doc.dependencies]
 numpydoc = "^1.8.0"
@@ -91,8 +108,6 @@ pytest = "^8.4.1"
 exclude = ["sandbox", "docs"]
 line-length = 88
 target-version = "py310"
-
-[tool.ruff.lint]
 ignore = [
   # pylint
   "PLR0913",
@@ -133,14 +148,14 @@ ignore = [
 ]
 select = ["ALL"]
 
-[tool.ruff.lint.flake8-quotes]
+[tool.ruff.flake8-quotes]
 inline-quotes = "double"
 
-[tool.ruff.lint.per-file-ignores]
+[tool.ruff.per-file-ignores]
 "examples/equations/bistable_ode/plot.ipynb" = ["ERA001"]
 "examples/equations/diffusion_1d/plot.ipynb" = ["ERA001"]
 "examples/equations/reaction_diffusion_1d/plot_for_paper.ipynb" = ["ERA001", "D103", "RUF003", "E501"]
 "examples/equations/wave_1d/plot.ipynb" = ["ERA001", "D103", "RUF003", "E501"]
 
-[tool.ruff.lint.pydocstyle]
+[tool.ruff.pydocstyle]
 convention = "numpy"

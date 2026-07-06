@@ -349,22 +349,42 @@ class ModularPlotCallback(Callback):
     panels: list
 
     plot_every: int = 100
+    figsize: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
-        """
-        Initialize the callback after instantiation.
+        self._fig = None
+        self._grid_spec = None
+        self._active_panels = []
+        self._notebook_output = None
 
-        This method is automatically called after the callback is instantiated. It sets
-        up the figure and grid specification for the modular plots, creates the panel
-        instances, and configures the interactive plotting mode.
+    def __getstate__(self) -> dict:
+        state = self.__dict__.copy()
+        state["_fig"] = None
+        state["_grid_spec"] = None
+        state["_active_panels"] = []
+        state["_notebook_output"] = None
+        return state
 
-        Notes
-        -----
-        The method creates a figure with dimensions proportional to the number of
-        panels, arranges the panels vertically using GridSpec, and initializes
-        interactive matplotlib mode for real-time updates.
+    @staticmethod
+    def _in_jupyter() -> bool:
+        try:
+            from IPython import get_ipython
+
+            shell = get_ipython()
+            return shell is not None and shell.__class__.__name__ == "ZMQInteractiveShell"
+        except ImportError:
+            return False
+
+    def on_train_begin(self, trainer_data: TrainerData) -> None:
         """
-        self._fig = plt.figure(figsize=(12, 3.5 * len(self.panels)))
+        Create the figure and panels at the start of training.
+
+        Deferring figure creation to here (rather than __post_init__) ensures that
+        in notebook environments the figure widget appears in the same output cell
+        as the train() call, not in the cell where the callback was instantiated.
+        """
+        figsize = self.figsize or (12, 3.5 * len(self.panels))
+        self._fig = plt.figure(figsize=figsize)
         self._grid_spec = GridSpec(len(self.panels), 1, figure=self._fig)
 
         self._active_panels = []
@@ -381,9 +401,17 @@ class ModularPlotCallback(Callback):
             )
             self._active_panels.append(panel)
 
-        plt.ion()
         plt.tight_layout()
-        plt.show()
+
+        if self._in_jupyter():
+            from IPython.display import display
+            from ipywidgets import Output
+
+            self._notebook_output = Output()
+            display(self._notebook_output)
+        else:
+            plt.ion()
+            plt.show()
 
     def on_iteration_end(self, trainer_data: TrainerData) -> None:
         """
@@ -412,5 +440,33 @@ class ModularPlotCallback(Callback):
         ):
             for panel in self._active_panels:
                 panel.update(trainer_data)
-            self._fig.canvas.draw()
-            self._fig.canvas.flush_events()
+
+            if self._notebook_output is not None:
+                from IPython.display import clear_output, display
+
+                with self._notebook_output:
+                    clear_output(wait=True)
+                    display(self._fig)
+            else:
+                self._fig.canvas.draw()
+                self._fig.canvas.flush_events()
+
+
+@dataclass(kw_only=True)
+class LBFGSResetOnResample(Callback):
+    """Reset the LBFGS curvature history before each resample step.
+
+    Parameters
+    ----------
+    resample_every : int
+        Must match the resample_parameters_every / resample_conditions_every
+        value used in the PDE.
+    """
+
+    resample_every: int
+
+    def on_iteration_begin(self, trainer_data: TrainerData) -> None:
+        """Clear optimizer state when a resample is about to occur."""
+        i = trainer_data.iteration
+        if i > 0 and i % self.resample_every == 0:
+            trainer_data.optimizer.state.clear()
