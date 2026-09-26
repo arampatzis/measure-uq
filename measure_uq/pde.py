@@ -448,20 +448,22 @@ class Conditions:
         Notes
         -----
         The L2 loss is computed as the mean of the squared L2 norm of the residuals
-        for each condition.
+        for each condition. The returned tensor has the device and dtype of the
+        residuals.
         """
-        res = torch.zeros(self.n)
-        for i, condition in enumerate(self.conditions):
-            res[i] = torch.mean(
-                torch.linalg.vector_norm(
-                    condition(model, parameters),
-                    ord=2,
-                    dim=1,
+        return torch.stack(
+            [
+                torch.mean(
+                    torch.linalg.vector_norm(
+                        condition(model, parameters),
+                        ord=2,
+                        dim=1,
+                    )
+                    ** 2,
                 )
-                ** 2,
-            )
-
-        return res
+                for condition in self.conditions
+            ],
+        )
 
     def eval(
         self,
@@ -695,7 +697,7 @@ class PDE:
             iteration,
         )
 
-        return torch.dot(self.loss_weights_, res)
+        return torch.dot(self.loss_weights_.to(res), res)
 
     def loss_train_for_closure(self, model: ModelWithCombinedInput) -> Tensor:
         """
@@ -721,7 +723,7 @@ class PDE:
             self.parameters_train.values,
         )
 
-        return torch.dot(self.loss_weights_, res)
+        return torch.dot(self.loss_weights_.to(res), res)
 
     def loss_test(self, model: ModelWithCombinedInput, iteration: int = 0) -> Tensor:
         """
@@ -751,7 +753,7 @@ class PDE:
             test=True,
         )
 
-        return torch.dot(self.loss_weights_, res)
+        return torch.dot(self.loss_weights_.to(res), res)
 
     def save(self, filename: str | Path = "pde.pickle") -> None:
         """
