@@ -126,22 +126,33 @@ def extend_vector_tensor(
     default_value: float = 0,
 ) -> torch.Tensor:
     """
-    Extend a tensor to a specified size, filling with a default value if necessary.
+    Extend a vector to a specified length by repeating its last element.
 
     Parameters
     ----------
     x : Tensor
-        The tensor to extend.
+        The vector to extend.
     n : int
-        The desired length of the output tensor.
+        The desired length of the output vector.
     default_value : int or float, optional
-        The default value to fill the tensor with when extending its length.
-        Defaults to 0.
+        The value used to fill the output when `x` is empty. Defaults to 0.
 
     Returns
     -------
     Tensor
-        The extended tensor, with length `N`.
+        The extended vector, with length `n`, on the device of `x`. If `x` is not
+        empty, the output has the dtype of `x`.
+
+    Raises
+    ------
+    ValueError
+        If `n` is not positive or `x` is longer than `n`.
+
+    Notes
+    -----
+    If `x` is shorter than `n`, its last element is repeated, so a single value
+    applies to all entries (e.g. `resample_conditions_every=(50,)` resamples
+    every condition every 50 iterations).
     """
     nx = x.shape[0]
 
@@ -149,18 +160,12 @@ def extend_vector_tensor(
         raise ValueError("`n` must be positive.")
 
     if nx == 0:
-        return torch.full((n,), default_value)
+        return torch.full((n,), default_value, device=x.device)
 
-    if nx == n:
-        return x
+    if nx > n:
+        raise ValueError("The size of `x` cannot be greater than `n`.")
 
-    if nx < n:
-        z = torch.empty(n)
-        z[:nx] = x
-        z[nx:] = x[-1]
-        return z
-
-    raise ValueError("The size of `x` cannot be greater than the size of `y`.")
+    return torch.cat([x, x[-1:].expand(n - nx)])
 
 
 def torch_numpoly_call(

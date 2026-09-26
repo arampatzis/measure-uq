@@ -9,7 +9,11 @@ import numpy as np
 import pytest
 import torch
 
-from measure_uq.utilities import SparseDynamicArray, torch_numpoly_call
+from measure_uq.utilities import (
+    SparseDynamicArray,
+    extend_vector_tensor,
+    torch_numpoly_call,
+)
 
 
 def test_torch_numpoly_call() -> None:
@@ -64,3 +68,23 @@ def test_sparse_dynamic_arrays() -> None:
 
     with pytest.raises(IndexError):
         x(11)
+
+
+def test_extend_vector_tensor() -> None:
+    """Test that extend_vector_tensor repeats the last element and keeps the dtype."""
+    x = extend_vector_tensor(torch.tensor([50]), 3, default_value=7)
+    assert x.dtype == torch.int64
+    assert x.tolist() == [50, 50, 50]
+
+    x = extend_vector_tensor(torch.tensor([5.0, 10.0], dtype=torch.float64), 4)
+    assert x.dtype == torch.float64
+    assert x.tolist() == [5.0, 10.0, 10.0, 10.0]
+
+    x = extend_vector_tensor(torch.tensor([1, 2]), 2)
+    assert x.dtype == torch.int64
+    assert x.tolist() == [1, 2]
+
+    assert extend_vector_tensor(torch.tensor([]), 2, default_value=7).tolist() == [7, 7]
+
+    with pytest.raises(ValueError, match="greater"):
+        extend_vector_tensor(torch.tensor([1, 2, 3]), 2)
