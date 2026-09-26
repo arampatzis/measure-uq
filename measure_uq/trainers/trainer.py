@@ -204,9 +204,8 @@ class Trainer:
 
                 self.one_train_step()
 
-                if not np.isfinite(
-                    self.trainer_data.losses_train[self.trainer_data.iteration]
-                ):
+                # The last stored value is the loss logged by this step.
+                if not np.isfinite(self.trainer_data.losses_train.v[-1]):
                     print("Training loss is NaN or Inf. Exiting training loop.")
                     break
 

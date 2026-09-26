@@ -816,6 +816,14 @@ class SparseDynamicArray:
     -----
     This implementation is useful for scenarios where most elements in an array are zero
     or when dealing with large arrays with relatively few non-zero elements.
+
+    Writing and reading use different indices:
+
+    - ``a[i] = v`` appends ``v`` and records it under the logical index ``i``.
+    - ``a(i)`` returns the value recorded under the logical index ``i``.
+    - ``a[k]`` returns the ``k``-th stored value (positional), e.g. ``a[-1]`` is
+      the last value written. It equals ``a(k)`` only if exactly one value was
+      written for every logical index ``0, ..., k``.
     """
 
     def __init__(
