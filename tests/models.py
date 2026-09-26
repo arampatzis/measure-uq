@@ -4,129 +4,46 @@ Unit tests for the models module.
 This module contains unit tests for the models module of measure-uq.
 """
 
-from typing import Any
-from unittest.mock import MagicMock
-
+import chaospy
 import numpy as np
 import torch
-from torch import tensor
 
 from measure_uq.models import PINN_PCE
 from measure_uq.networks import FeedforwardBuilder
-
-
-class MockModule(torch.nn.Module):
-    """
-    A mock torch.nn.Module for testing.
-
-    This class is used in unit tests to create mock instances of torch.nn.Module.
-    It provides a way to check if the forward method of the module was called with
-    the correct arguments.
-
-    Parameters
-    ----------
-    return_value : torch.Tensor
-        The value to be returned by the mock forward method.
-
-    Attributes
-    ----------
-    _mock : unittest.mock.MagicMock
-        The mock object for the forward method of the module.
-    """
-
-    def __init__(self, return_value: torch.Tensor) -> None:
-        """
-        Initialize the MockModule with a return value.
-
-        Parameters
-        ----------
-        return_value : torch.Tensor
-            The value to be returned by the mock forward method.
-        """
-        super().__init__()
-        self._mock = MagicMock()
-        self._mock.return_value = return_value
-
-    def forward(self, *args: Any, **kwargs: Any) -> torch.Tensor:
-        """
-        Mock the forward method.
-
-        Parameters
-        ----------
-        *args : Any
-            Positional arguments passed to the forward method.
-        **kwargs : Any
-            Keyword arguments passed to the forward method.
-
-        Returns
-        -------
-        torch.Tensor
-            The mock return value.
-        """
-        return self._mock(*args, **kwargs)
-
-    def assert_called_with(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Assert that the forward method was called with the correct arguments.
-
-        Parameters
-        ----------
-        *args : Any
-            Positional arguments expected in the call.
-        **kwargs : Any
-            Keyword arguments expected in the call.
-        """
-        self._mock.assert_called_with(*args, **kwargs)
 
 
 def test_pinn_pce() -> None:
     """
     Test the evaluation of the PINN_PCE model.
 
-    Input/Output of the NN: [-1, 2, -3]
-    Expansion:[...]
+    The output for the point `x_i` and the parameter `p_j` is at row
+    `i * Np + j` and must equal `sum_k c_k(x_i) phi_k(p_j)`, where `c` is the
+    output of the network and `phi` is the expansion evaluated by chaospy.
     """
-    Nsp = 30
-    Np = 1
-    Ne = 3
-
-    # Set the evaluation of the basis functions.
-    # Assume one parameter, and an expansion of size one that maps `x` to `x`.
-    expansion = MagicMock()
-    expansion.return_value = np.tile(
-        np.arange(
-            1,
-            Nsp + 1,
-            dtype=np.float32,
-        )[:, None],
-        (1, Ne),
-    ).T
-    expansion.__len__.return_value = Ne
+    joint = chaospy.J(
+        chaospy.Uniform(0, 4),
+        chaospy.Uniform(0.8, 1.2),
+    )
+    expansion = chaospy.generate_expansion(3, joint, normed=True)
 
     model = PINN_PCE(
-        network_builder=FeedforwardBuilder([1, 1, 1]),
+        network_builder=FeedforwardBuilder([1, 8, len(expansion)]),
         expansion=expansion,
     )
 
-    # Set the output of each network to be equal to the input
-    Nsx = 20
-    x = -torch.arange(
-        1,
-        Nsx + 1,
-        dtype=torch.float32,
-    ).view(-1, 1)
+    Nx, Np = 7, 5
+    x = torch.linspace(0, 1, Nx)[:, None]
+    p = torch.tensor(joint.sample(Np, seed=0).T, dtype=torch.float32)
 
-    model.net = MockModule(x)
+    z, y = model(x, p)
 
-    # These values are irrelevant for this test
-    p = torch.zeros((Nsp, Np), dtype=torch.float32)
+    with torch.no_grad():
+        c = model.network(x).double().numpy()
+    phi = expansion(*p.double().numpy().T)
+    expected = (c @ phi).reshape(-1, 1)
 
-    # Evaluate the model
-    m = model(x, p).squeeze(-1)
-
-    # The way we mocked the model evaluation, corresponds to the product of the
-    # input with the single expansion
-    mm = model.combine_input(x, tensor(expansion.return_value[0, :][:, None]))
-    mm = Ne * torch.prod(mm, 1)
-
-    assert torch.equal(m, mm)
+    assert z.shape == (Nx * Np, 3)
+    assert torch.equal(z[:, :1], x.repeat_interleave(Np, dim=0))
+    assert torch.equal(z[:, 1:], p.repeat(Nx, 1))
+    assert y.shape == (Nx * Np, 1)
+    assert np.allclose(y.detach().numpy(), expected, rtol=1e-6, atol=1e-10)
