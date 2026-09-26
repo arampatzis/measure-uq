@@ -64,7 +64,7 @@ def set_log_scale_with_latex(
 def plot_losses(
     trainer_data: TrainerData,
     figsize: tuple = (20, 10),
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, np.ndarray]:
     """
     Plot the losses during training and testing and the losses of each condition.
 
@@ -79,7 +79,7 @@ def plot_losses(
     -------
     fig : matplotlib.figure.Figure
         The figure.
-    ax : matplotlib.axes.Axes
+    ax : numpy.ndarray of matplotlib.axes.Axes
         The axes.
     """
     fig, ax = plt.subplots(1, 2, figsize=figsize)
@@ -135,7 +135,7 @@ class PlotDataOnGrid:
 def plot_1d_on_grid(
     data: list[PlotDataOnGrid],
     figsize: tuple = (10, 10),
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, np.ndarray]:
     """
     Plot 1D data on a grid of subplots.
 
@@ -152,7 +152,7 @@ def plot_1d_on_grid(
     -------
     fig : matplotlib.figure.Figure
         The figure object for the plot.
-    ax : list[matplotlib.axes.Axes]
+    ax : numpy.ndarray of matplotlib.axes.Axes
         The axes objects for the plot.
     """
     N = len(data)
@@ -197,7 +197,7 @@ def plot_ode_on_grid(
     analytical_solution: Callable,
     approximate_solution: Callable,
     figsize: tuple = (10, 10),
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, np.ndarray]:
     """
     Plot the analytical and approximate solution of an ODE on a grid of subplots.
 
@@ -222,7 +222,7 @@ def plot_ode_on_grid(
     -------
     fig : matplotlib.figure.Figure
         The figure.
-    ax : matplotlib.axes.Axes
+    ax : numpy.ndarray of matplotlib.axes.Axes
         The axes.
     """
     model.eval()

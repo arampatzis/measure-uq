@@ -209,7 +209,8 @@ def plot(
         if controller.stop_requested:
             print("Stopping animation...")
             controller.close()
-            anime.event_source.stop()
+            if anime.event_source is not None:
+                anime.event_source.stop()  # type: ignore[no-untyped-call]
             if plt.get_fignums():
                 plt.close("all")
             return ()  # type: ignore[return-value]
