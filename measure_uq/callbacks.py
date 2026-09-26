@@ -273,7 +273,7 @@ class CallbackLog(Callback):
     - Current iteration number
     - Current loss value
     - Gradient norm (if show_grad_norm=True)
-    - Learning rate (if show_lr=True and scheduler exists)
+    - Learning rate of the optimizer (if show_lr=True)
     """
 
     print_every: int = 100
@@ -319,7 +319,7 @@ class CallbackLog(Callback):
                 grad_str = f"(grad: {grad:.2e})"
 
             lr_str = ""
-            if self.show_lr and hasattr(trainer_data, "scheduler"):
+            if self.show_lr:
                 lr = trainer_data.optimizer.param_groups[0]["lr"]
                 lr_str = f"(lr: {lr:.2e})"
 
