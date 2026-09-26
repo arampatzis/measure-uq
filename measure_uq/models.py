@@ -290,6 +290,17 @@ class PINN_PCE(ModelWithCombinedInput):
     expansion : PolyExpansion
         The polynomial expansion used in the model.
         :no-index:
+
+    Notes
+    -----
+    The output is `y(x, xi) = sum_k c_k(x) phi_k(xi)`, where the network computes
+    the coefficients `c_k(x)` from the first `Nx` columns of the combined input `z`
+    returned by `forward`, and the basis `phi_k(xi)` is evaluated from the
+    parameters `p`, not from `z`. Therefore derivatives of the
+    output with respect to the input columns of `z` (e.g. `jacobian(y, z, j=0)`)
+    are correct, but derivatives with respect to the parameter columns of `z`
+    are silently zero. Conditions must not differentiate with respect to the
+    parameters when used with this model.
     """
 
     coefficients: torch.Tensor
