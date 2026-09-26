@@ -14,7 +14,7 @@ Original source: https://github.com/lululxvi/deepxde
 """
 
 from dataclasses import dataclass
-from tkinter import TclError
+from typing import TYPE_CHECKING, Any
 
 import torch
 from matplotlib import pyplot as plt
@@ -22,6 +22,19 @@ from matplotlib.gridspec import GridSpec
 
 from measure_uq.trainers.trainer_data import TrainerData
 from measure_uq.utilities import KeyController
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+
+class _NoTclError(Exception):
+    """Placeholder for `tkinter.TclError` when Python is built without Tk."""
+
+
+try:
+    from tkinter import TclError
+except ImportError:  # Without Tk there are no Tk figures that could raise it.
+    TclError = _NoTclError  # type: ignore[misc, assignment]
 
 
 @dataclass(kw_only=True)
@@ -353,12 +366,21 @@ class ModularPlotCallback(Callback):
     figsize: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
-        self._fig = None
-        self._grid_spec = None
-        self._active_panels = []
-        self._notebook_output = None
+        """Initialize the figure state; the figure is created in `on_train_begin`."""
+        self._fig: Figure | None = None
+        self._grid_spec: GridSpec | None = None
+        self._active_panels: list[Any] = []
+        self._notebook_output: Any = None
 
-    def __getstate__(self) -> dict:
+    def __getstate__(self) -> dict[str, Any]:
+        """
+        Return the state for pickling, without the figure and its widgets.
+
+        Returns
+        -------
+        dict[str, Any]
+            The state of the callback with the figure state reset.
+        """
         state = self.__dict__.copy()
         state["_fig"] = None
         state["_grid_spec"] = None
@@ -368,23 +390,34 @@ class ModularPlotCallback(Callback):
 
     @staticmethod
     def _in_jupyter() -> bool:
+        """
+        Check whether the code runs in a Jupyter kernel.
+
+        Returns
+        -------
+        bool
+            True if running in a Jupyter kernel, False otherwise.
+        """
         try:
             from IPython import get_ipython
-
-            shell = get_ipython()
-            return (
-                shell is not None and shell.__class__.__name__ == "ZMQInteractiveShell"
-            )
         except ImportError:
             return False
 
-    def on_train_begin(self, trainer_data: TrainerData) -> None:
+        shell = get_ipython()  # type: ignore[no-untyped-call]
+        return shell is not None and shell.__class__.__name__ == "ZMQInteractiveShell"
+
+    def on_train_begin(self, trainer_data: TrainerData) -> None:  # noqa: ARG002
         """
         Create the figure and panels at the start of training.
 
         Deferring figure creation to here (rather than __post_init__) ensures that
         in notebook environments the figure widget appears in the same output cell
         as the train() call, not in the cell where the callback was instantiated.
+
+        Parameters
+        ----------
+        trainer_data : TrainerData
+            The trainer data containing the data of the trainer.
         """
         figsize = self.figsize or (12, 3.5 * len(self.panels))
         self._fig = plt.figure(figsize=figsize)
@@ -408,10 +441,10 @@ class ModularPlotCallback(Callback):
 
         if self._in_jupyter():
             from IPython.display import display
-            from ipywidgets import Output
+            from ipywidgets import Output  # type: ignore[import-untyped]
 
             self._notebook_output = Output()
-            display(self._notebook_output)
+            display(self._notebook_output)  # type: ignore[no-untyped-call]
         else:
             plt.ion()
             plt.show()
@@ -448,9 +481,10 @@ class ModularPlotCallback(Callback):
                 from IPython.display import clear_output, display
 
                 with self._notebook_output:
-                    clear_output(wait=True)
-                    display(self._fig)
+                    clear_output(wait=True)  # type: ignore[no-untyped-call]
+                    display(self._fig)  # type: ignore[no-untyped-call]
             else:
+                assert self._fig is not None, "on_train_begin was not called."
                 self._fig.canvas.draw()
                 self._fig.canvas.flush_events()
 
