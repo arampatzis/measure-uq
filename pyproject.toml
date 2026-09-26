@@ -106,6 +106,11 @@ venv = ".venv"
 # Use the Poetry in-project venv so Pylance/Pyright resolves third-party imports (e.g. chaospy).
 venvPath = "."
 
+[tool.pytest.ini_options]
+# Test modules in tests/ are not named test_*.py.
+python_files = ["*.py"]
+testpaths = ["tests"]
+
 [tool.ruff]
 exclude = ["sandbox", "docs"]
 line-length = 88
