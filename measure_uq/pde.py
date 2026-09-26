@@ -146,7 +146,12 @@ class Condition(ABC):
     points : Tensor
         A tensor containing the points for the condition.
     loss : SparseDynamicArray
-        A dynamic array to store the loss values.
+        A dynamic array to store the loss values evaluated on the training
+        parameters.
+    loss_test : SparseDynamicArray
+        A dynamic array to store the loss values evaluated on the test parameters.
+        Kept separate from `loss` because the same condition object may be shared
+        by the training and the test `Conditions`.
     buffer : Buffer
         A buffer to store additional data for the condition.
 
@@ -165,6 +170,12 @@ class Condition(ABC):
     points: Tensor = field(init=True, repr=True, default_factory=torch.Tensor)
 
     loss: SparseDynamicArray = field(
+        init=False,
+        repr=True,
+        default_factory=lambda: SparseDynamicArray(shape=1000, dtype=float),
+    )
+
+    loss_test: SparseDynamicArray = field(
         init=False,
         repr=True,
         default_factory=lambda: SparseDynamicArray(shape=1000, dtype=float),
@@ -198,6 +209,25 @@ class Condition(ABC):
             )
 
         self.points.requires_grad = True
+
+    def __setstate__(self, state: dict) -> None:
+        """
+        Restore the condition from a pickled state.
+
+        Conditions pickled before the `loss_test` attribute existed do not
+        contain it; an empty array is created for them so that they can still
+        be evaluated on test parameters.
+
+        Parameters
+        ----------
+        state : dict
+            The pickled state of the condition.
+        """
+        state.setdefault(
+            "loss_test",
+            SparseDynamicArray(shape=1000, dtype=float),
+        )
+        self.__dict__.update(state)
 
     def to(self, device: DeviceLikeType) -> None:
         """
@@ -438,6 +468,8 @@ class Conditions:
         model: ModelWithCombinedInput,
         parameters: Tensor,
         iteration: int,
+        *,
+        test: bool = False,
     ) -> Tensor:
         """
         Evaluate the conditions and store the loss.
@@ -450,6 +482,9 @@ class Conditions:
             The parameters to use for the evaluation.
         iteration : int
             The current iteration.
+        test : bool, optional
+            If True, store the loss in the `loss_test` attribute of each
+            condition instead of the `loss` attribute, by default False.
 
         Returns
         -------
@@ -460,12 +495,16 @@ class Conditions:
         -----
         This method is used to evaluate the conditions at each iteration. The
         actual evaluation is done by calling the `eval` method of each
-        condition. The results are then stored in the `loss` attribute of each
-        condition.
+        condition. The results are then stored in the `loss` (or `loss_test`)
+        attribute of each condition. Keeping the two logs separate matters when
+        the same condition objects are shared by the training and the test
+        conditions: otherwise the test losses would be interleaved with the
+        training losses in `loss`.
         """
         res = self.l2_loss(model, parameters)
         for i, condition in enumerate(self.conditions):
-            condition.loss[iteration] = res[i].item()
+            log = condition.loss_test if test else condition.loss
+            log[iteration] = res[i].item()
 
         return res
 
@@ -690,6 +729,8 @@ class PDE:
 
         This method evaluates the test conditions using the provided model and
         parameters, and computes the weighted loss based on the specified loss weights.
+        The per-condition losses are stored in the `loss_test` attribute of each
+        condition.
 
         Parameters
         ----------
@@ -707,6 +748,7 @@ class PDE:
             model,
             self.parameters_test.values,
             iteration,
+            test=True,
         )
 
         return torch.dot(self.loss_weights_, res)
