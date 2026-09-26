@@ -16,7 +16,7 @@ This module provides:
 
 # ruff: noqa: N801
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Self
 
@@ -28,7 +28,7 @@ from measure_uq.networks import NetworkBuilder
 from measure_uq.utilities import ArrayLike1DInt, PolyExpansion, torch_numpoly_call
 
 
-class ModelWithCombinedInput(nn.Module):
+class ModelWithCombinedInput(nn.Module, ABC):
     """
     A model that combines input and parameters.
 
@@ -100,15 +100,21 @@ class ModelWithCombinedInput(nn.Module):
         """
         raise NotImplementedError("Must implement in subclass.")
 
+    @classmethod
     @abstractmethod
-    def load(self, file_path: str | Path) -> Self:
+    def load(cls, file_path: str | Path) -> Self:
         """
-        Load the model's state and parameters from a file.
+        Load a model from a file and return an instance.
 
         Parameters
         ----------
         file_path : str | Path
             The path to the file from which to load the model.
+
+        Returns
+        -------
+        Self
+            The loaded model instance.
         """
         raise NotImplementedError("Must implement in subclass.")
 
